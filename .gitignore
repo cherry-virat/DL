@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# Model files
+*.pth
+*.pt
+*.ckpt
+
+# MRI datasets
+datasets/
+*.nii
+*.nii.gz
+
+# Output folders
+outputs/
+
+# Operating system files
+.DS_Store
+Thumbs.db
