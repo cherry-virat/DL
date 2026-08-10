@@ -24,7 +24,7 @@ env/
 datasets/
 *.nii
 *.nii.gz
-
+py -3.12 -m venv .venv
 # Output folders
 outputs/
 
