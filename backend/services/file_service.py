@@ -4,7 +4,9 @@ import uuid
 from werkzeug.utils import secure_filename
 
 
-UPLOAD_DIR = Path("outputs/uploads")
+from pathlib import Path
+
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "outputs" / "uploads"
 
 UPLOAD_DIR.mkdir(
     parents=True,
@@ -39,3 +41,22 @@ def save_uploaded_file(file) -> dict:
         "saved_filename": saved_filename,
         "path": str(saved_path),
     }
+def get_uploaded_file(file_id: str):
+    """
+    Find an uploaded MRI file using its file ID.
+    """
+
+    if not file_id:
+        return None
+
+    for file_path in UPLOAD_DIR.glob(
+        f"{file_id}_*"
+    ):
+
+        return {
+            "file_id": file_id,
+            "filename": file_path.name,
+            "path": str(file_path),
+        }
+
+    return None
