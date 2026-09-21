@@ -16,6 +16,10 @@ body {
   min-height: 100vh;
 }
 
+/* ------------------------------------------
+   HEADER
+------------------------------------------ */
+
 .header {
   background: #172554;
   color: white;
@@ -34,6 +38,10 @@ body {
   opacity: 0.9;
 }
 
+/* ------------------------------------------
+   MAIN
+------------------------------------------ */
+
 .main {
   max-width: 1000px;
   margin: 40px auto;
@@ -41,69 +49,237 @@ body {
 
   display: grid;
   grid-template-columns: 1fr 1fr;
+
   gap: 25px;
 }
 
+/* ------------------------------------------
+   CARD
+------------------------------------------ */
+
 .card {
   background: white;
+
   border-radius: 12px;
+
   padding: 30px;
 
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 .card h2 {
   margin-top: 0;
 }
 
+/* ------------------------------------------
+   DESCRIPTION
+------------------------------------------ */
+
 .description {
   color: #555;
+
   line-height: 1.6;
 }
 
-button {
+/* ------------------------------------------
+   BUTTON
+------------------------------------------ */
+
+.button {
   border: none;
+
   border-radius: 8px;
+
   padding: 12px 20px;
 
   background: #2563eb;
+
   color: white;
 
   font-size: 15px;
+
   cursor: pointer;
+
   margin-top: 15px;
 }
 
-button:hover {
+.button:hover {
   background: #1d4ed8;
 }
 
-button:disabled {
+.button:disabled {
   opacity: 0.6;
+
   cursor: not-allowed;
 }
 
+/* ------------------------------------------
+   FILE INPUT
+------------------------------------------ */
+
+input[type="file"] {
+  display: block;
+
+  margin-top: 20px;
+
+  width: 100%;
+
+  padding: 10px;
+
+  border: 1px solid #d1d5db;
+
+  border-radius: 8px;
+}
+
+/* ------------------------------------------
+   SELECTED FILE
+------------------------------------------ */
+
+.selected-file {
+  margin-top: 20px;
+
+  padding: 15px;
+
+  border-radius: 8px;
+
+  background: #eff6ff;
+
+  border: 1px solid #bfdbfe;
+}
+
+.selected-file p {
+  margin: 8px 0 0;
+
+  word-break: break-word;
+}
+
+/* ------------------------------------------
+   STATUS
+------------------------------------------ */
+
 .status {
   margin-top: 20px;
+
   padding: 12px;
 
   border-radius: 8px;
+
   background: #f1f5f9;
+
+  font-weight: bold;
+
+  word-break: break-word;
+}
+
+/* ------------------------------------------
+   FILE ID
+------------------------------------------ */
+
+.file-id {
+  margin-top: 15px;
+
+  padding: 12px;
+
+  background: #f8fafc;
+
+  border-radius: 8px;
+
+  border: 1px solid #e2e8f0;
+}
+
+.file-id p {
+  margin: 8px 0 0;
+
+  font-size: 12px;
+
+  word-break: break-all;
+
+  color: #475569;
+}
+
+/* ------------------------------------------
+   ANALYZE BUTTON
+------------------------------------------ */
+
+.analyze-button {
+  margin-left: 10px;
+}
+
+/* ------------------------------------------
+   RESULT CARD
+------------------------------------------ */
+
+.result-card {
+  grid-column: 1 / -1;
+}
+
+.result-row {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  padding: 15px 0;
+
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.result-row span {
+  color: #475569;
+}
+
+.result-row strong {
+  font-size: 18px;
+}
+
+/* ------------------------------------------
+   RESULT NOTE
+------------------------------------------ */
+
+.result-note {
+  margin-top: 20px;
+
+  padding: 15px;
+
+  background: #fff7ed;
+
+  border: 1px solid #fed7aa;
+
+  border-radius: 8px;
+
+  color: #9a3412;
+
+  line-height: 1.5;
+}
+
+/* ------------------------------------------
+   ERROR
+------------------------------------------ */
+
+.error {
+  margin-top: 15px;
+
+  padding: 15px;
+
+  background: #fef2f2;
+
+  border: 1px solid #fecaca;
+
+  border-radius: 8px;
+
+  color: #b91c1c;
 
   font-weight: bold;
 }
 
-input[type="file"] {
-  display: block;
-  margin-top: 20px;
-  width: 100%;
-}
-
-.analyze-button {
-  margin-top: 20px;
-}
+/* ------------------------------------------
+   MOBILE
+------------------------------------------ */
 
 @media (max-width: 700px) {
+
   .main {
     grid-template-columns: 1fr;
   }
@@ -111,4 +287,13 @@ input[type="file"] {
   .header h1 {
     font-size: 28px;
   }
+
+  .result-card {
+    grid-column: auto;
+  }
+
+  .analyze-button {
+    margin-left: 0;
+  }
+
 }
