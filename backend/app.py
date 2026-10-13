@@ -3,6 +3,7 @@ from flask_cors import CORS
 
 from routes.upload import upload_bp
 from routes.predict import predict_bp
+from routes.report import report_bp
 
 
 app = Flask(__name__)
@@ -12,6 +13,7 @@ CORS(app)
 
 app.register_blueprint(upload_bp)
 app.register_blueprint(predict_bp)
+app.register_blueprint(report_bp)
 
 
 @app.route("/")
