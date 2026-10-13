@@ -275,6 +275,54 @@ input[type="file"] {
 }
 
 /* ------------------------------------------
+   REPORT ACTION
+------------------------------------------ */
+
+.report-action {
+  margin-top: 20px;
+
+  padding-top: 20px;
+
+  border-top: 1px solid #e5e7eb;
+}
+
+.report-button {
+  background: #059669;
+}
+
+.report-button:hover {
+  background: #047857;
+}
+
+.report-button:disabled {
+  background: #059669;
+
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+.report-status {
+  margin-top: 15px;
+}
+
+.report-status-error {
+  background: #fef2f2;
+
+  border: 1px solid #fecaca;
+
+  color: #b91c1c;
+}
+
+.report-status-success {
+  background: #ecfdf5;
+
+  border: 1px solid #a7f3d0;
+
+  color: #065f46;
+}
+
+/* ------------------------------------------
    MOBILE
 ------------------------------------------ */
 

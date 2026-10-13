@@ -13,6 +13,9 @@ function App() {
 
   const [fileId, setFileId] = useState("");
 
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportStatus, setReportStatus] = useState("");
+
   // --------------------------------------------------
   // CHECK BACKEND
   // --------------------------------------------------
@@ -52,6 +55,7 @@ function App() {
       setUploadStatus("");
       setFileId("");
       setPredictionResult(null);
+      setReportStatus("");
       return;
     }
 
@@ -59,6 +63,7 @@ function App() {
     setUploadStatus("");
     setFileId("");
     setPredictionResult(null);
+    setReportStatus("");
   };
 
   // --------------------------------------------------
@@ -75,6 +80,7 @@ function App() {
     setUploadStatus("Uploading MRI...");
     setFileId("");
     setPredictionResult(null);
+    setReportStatus("");
 
     try {
       const formData = new FormData();
@@ -117,6 +123,7 @@ function App() {
   // PREDICT MRI
   // --------------------------------------------------
 
+  // eslint-disable-next-line no-unused-vars
   const predictMRI = async () => {
     if (!fileId) {
       setUploadStatus(
@@ -127,6 +134,7 @@ function App() {
 
     setPredictionLoading(true);
     setPredictionResult(null);
+    setReportStatus("");
 
     try {
       const response = await fetch(
@@ -180,6 +188,7 @@ function App() {
     setUploadStatus("Uploading MRI...");
     setPredictionResult(null);
     setFileId("");
+    setReportStatus("");
 
     try {
       const formData = new FormData();
@@ -256,6 +265,86 @@ function App() {
     } finally {
       setUploadLoading(false);
       setPredictionLoading(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // GENERATE PDF REPORT
+  // --------------------------------------------------
+
+  const generateReport = async () => {
+    if (reportLoading) {
+      return;
+    }
+
+    const effectiveFileId = fileId || predictionResult?.file_id;
+
+    if (!effectiveFileId || !predictionResult?.success) {
+      setReportStatus(
+        "❌ Please complete MRI analysis before generating a report."
+      );
+      return;
+    }
+
+    setReportLoading(true);
+    setReportStatus("Generating PDF report...");
+
+    try {
+      const response = await fetch("http://127.0.0.1:5000/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          file_id: effectiveFileId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || "Failed to generate report from backend."
+        );
+      }
+
+      if (!data.download_url) {
+        throw new Error("Backend did not provide a download URL.");
+      }
+
+      setReportStatus("Downloading PDF report...");
+
+      const downloadPath = data.download_url.startsWith("http")
+        ? data.download_url
+        : `http://127.0.0.1:5000${data.download_url}`;
+
+      const downloadResponse = await fetch(downloadPath);
+
+      if (!downloadResponse.ok) {
+        throw new Error(
+          `Failed to download PDF report (HTTP ${downloadResponse.status}).`
+        );
+      }
+
+      const blob = await downloadResponse.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = blobUrl;
+      downloadLink.download =
+        data.filename || `report_${effectiveFileId}.pdf`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      window.URL.revokeObjectURL(blobUrl);
+
+      setReportStatus(
+        `✅ Report downloaded successfully: ${data.filename || "PDF report"}`
+      );
+    } catch (error) {
+      console.error(error);
+      setReportStatus(`❌ Report generation failed: ${error.message}`);
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -463,6 +552,41 @@ function App() {
                   ⚠️ Current result is from the
                   mock prediction endpoint. It is
                   not a real medical diagnosis.
+
+                </div>
+
+                {/* REPORT GENERATION */}
+
+                <div className="report-action">
+
+                  <button
+                    onClick={generateReport}
+                    disabled={
+                      !(fileId || predictionResult?.file_id) ||
+                      !predictionResult ||
+                      !predictionResult.success ||
+                      reportLoading
+                    }
+                    className="button report-button"
+                  >
+                    {reportLoading
+                      ? "Generating Report..."
+                      : "Generate PDF Report"}
+                  </button>
+
+                  {reportStatus && (
+                    <div
+                      className={`status report-status ${
+                        reportStatus.includes("❌")
+                          ? "report-status-error"
+                          : reportStatus.includes("✅")
+                          ? "report-status-success"
+                          : ""
+                      }`}
+                    >
+                      {reportStatus}
+                    </div>
+                  )}
 
                 </div>
               </>
