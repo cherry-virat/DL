@@ -95,8 +95,39 @@ RESEARCH_DISCLAIMER = (
 )
 
 
+def is_segmentation_mask_filename(filename: str) -> bool:
+    """
+    Checks whether a filename represents a segmentation mask or ground-truth label volume
+    rather than a raw structural MRI acquisition sequence.
+    """
+    fn_lower = filename.lower()
+    base = fn_lower
+    for ext in (".gz", ".nii", ".tar", ".zip"):
+        if base.endswith(ext):
+            base = base[:-len(ext)]
+
+    if base in ("seg", "mask", "gtv", "label", "labels"):
+        return True
+
+    for tok in ("-seg", "_seg", ".seg", "-mask", "_mask", ".mask", "-gtv", "_gtv", ".gtv"):
+        if base.endswith(tok):
+            return True
+
+    for tok in ("seg", "mask", "gtv"):
+        if f"-{tok}-" in fn_lower or f"_{tok}_" in fn_lower or f".{tok}." in fn_lower:
+            return True
+        if fn_lower.endswith(f"-{tok}.nii.gz") or fn_lower.endswith(f"_{tok}.nii.gz"):
+            return True
+        if fn_lower.endswith(f"-{tok}.nii") or fn_lower.endswith(f"_{tok}.nii"):
+            return True
+
+    return False
+
+
 def detect_modality_key(filename: str) -> Optional[str]:
-    """Infers modality key from standard file naming conventions."""
+    """Infers modality key from standard file naming conventions. Returns None for masks."""
+    if is_segmentation_mask_filename(filename):
+        return None
     fn = filename.lower()
     if "t1c" in fn or "t1ce" in fn or "t1_ce" in fn or "t1-ce" in fn:
         return "t1c"
@@ -545,4 +576,3 @@ def run_meningioma_multimodal_inference(
     """Convenience functional interface for Multimodal Meningioma inference."""
     service = MeningiomaMultimodalInferenceService()
     return service.predict(case_input, **kwargs)
-

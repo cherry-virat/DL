@@ -29,6 +29,7 @@ class TumorType(str, Enum):
     GLIOMA = "glioma"
     MENINGIOMA = "meningioma"
     MENINGIOMA_MULTIMODAL = "meningioma_multimodal"
+    AUTO = "auto"
 
 
 class PipelineStatus(str, Enum):
@@ -268,6 +269,69 @@ class SegmentationResult:
             return _convert(dict(data))
 
         raw_dict = asdict(self, dict_factory=_custom_asdict_factory)
+
+        # Backward compatibility and frontend contract aliases:
+        raw_dict["request_id"] = self.request.request_id
+        raw_dict["request_metadata"] = raw_dict["request"]
+        raw_dict["volumetric_summary"] = raw_dict["volumetrics"]
+
+        if self.glioma and "glioma" in raw_dict and raw_dict["glioma"]:
+            sub = raw_dict["glioma"].get("subregions", {})
+            raw_dict["glioma_measurements"] = {
+                "subregions": sub,
+                "subregion_volumes": {
+                    "wt_volume_mm3": sub.get("wt_volume_mm3", 0.0),
+                    "wt_volume_cm3": sub.get("wt_volume_cm3", 0.0),
+                    "tc_volume_mm3": sub.get("tc_volume_mm3", 0.0),
+                    "tc_volume_cm3": sub.get("tc_volume_cm3", 0.0),
+                    "et_volume_mm3": sub.get("et_volume_mm3", 0.0),
+                    "et_volume_cm3": sub.get("et_volume_cm3", 0.0),
+                    "ncr_volume_mm3": sub.get("ncr_net_volume_mm3", 0.0),
+                    "ncr_volume_cm3": sub.get("ncr_net_volume_cm3", 0.0),
+                    "ed_volume_mm3": sub.get("edema_volume_mm3", 0.0),
+                    "ed_volume_cm3": sub.get("edema_volume_cm3", 0.0),
+                },
+                "label_definitions": raw_dict["glioma"].get("label_definitions"),
+            }
+
+        if self.meningioma_multimodal and "meningioma_multimodal" in raw_dict and raw_dict["meningioma_multimodal"]:
+            sub = raw_dict["meningioma_multimodal"].get("subregions", {})
+            raw_dict["meningioma_measurements"] = {
+                "subregions": sub,
+                "subregion_volumes": {
+                    "wt_volume_mm3": sub.get("wt_volume_mm3", 0.0),
+                    "wt_volume_cm3": sub.get("wt_volume_cm3", 0.0),
+                    "et_volume_mm3": sub.get("et_volume_mm3", 0.0),
+                    "et_volume_cm3": sub.get("et_volume_cm3", 0.0),
+                    "ncr_volume_mm3": sub.get("ncr_net_volume_mm3", 0.0),
+                    "ncr_volume_cm3": sub.get("ncr_net_volume_cm3", 0.0),
+                    "ed_volume_mm3": sub.get("edema_volume_mm3", 0.0),
+                    "ed_volume_cm3": sub.get("edema_volume_cm3", 0.0),
+                    "tc_volume_mm3": sub.get("tc_volume_mm3", 0.0),
+                    "tc_volume_cm3": sub.get("tc_volume_cm3", 0.0),
+                },
+                "label_definitions": raw_dict["meningioma_multimodal"].get("label_definitions"),
+            }
+        elif self.meningioma and "meningioma" in raw_dict and raw_dict["meningioma"]:
+            gtv_vol_mm3 = raw_dict["meningioma"].get("gtv_volume_mm3", 0.0)
+            gtv_vol_cm3 = raw_dict["meningioma"].get("gtv_volume_cm3", 0.0)
+            raw_dict["meningioma_measurements"] = {
+                "subregions": raw_dict["meningioma"],
+                "subregion_volumes": {
+                    "wt_volume_mm3": gtv_vol_mm3,
+                    "wt_volume_cm3": gtv_vol_cm3,
+                    "et_volume_mm3": 0.0,
+                    "et_volume_cm3": 0.0,
+                    "ncr_volume_mm3": 0.0,
+                    "ncr_volume_cm3": 0.0,
+                    "ed_volume_mm3": 0.0,
+                    "ed_volume_cm3": 0.0,
+                    "tc_volume_mm3": 0.0,
+                    "tc_volume_cm3": 0.0,
+                },
+                "label_definitions": raw_dict["meningioma"].get("label_definitions"),
+            }
+
         return raw_dict
 
     def to_json(self, indent: int = 2) -> str:
@@ -278,7 +342,7 @@ class SegmentationResult:
     def from_dict(cls, data: Dict[str, Any]) -> "SegmentationResult":
         """Reconstruct a SegmentationResult instance from a dictionary."""
         # Deep reconstruction of sub-dataclasses
-        req_data = data.get("request", {})
+        req_data = data.get("request", data.get("request_metadata", {}))
         req = RequestMetadata(
             request_id=req_data["request_id"],
             tumor_type=TumorType(req_data["tumor_type"]),
@@ -300,7 +364,7 @@ class SegmentationResult:
             resampled_spacing=inp_data.get("resampled_spacing", [1.0, 1.0, 1.0]),
         )
 
-        vol_data = data.get("volumetrics", {})
+        vol_data = data.get("volumetrics", data.get("volumetric_summary", {}))
         vol = VolumetricSummary(
             total_tumor_voxels=vol_data["total_tumor_voxels"],
             total_tumor_volume_mm3=vol_data["total_tumor_volume_mm3"],
@@ -489,4 +553,3 @@ class SegmentationResult:
     def from_json(cls, json_str: str) -> "SegmentationResult":
         """Reconstruct a SegmentationResult instance from a JSON string."""
         return cls.from_dict(json.loads(json_str))
-

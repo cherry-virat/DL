@@ -233,3 +233,78 @@ def test_invalid_meningioma_inputs_rejection():
     with pytest.raises(TypeError, match="Unsupported input_data type"):
         router.route("meningioma", 999.0)
 
+
+def test_router_correct_model_selection_isolation():
+    """Test 8: Verifies strict model isolation - glioma routes ONLY to glioma service and meningioma ONLY to meningioma service."""
+    mock_glioma_svc = MagicMock()
+    mock_meningioma_svc = MagicMock()
+
+    mock_glioma_svc.predict.return_value = MagicMock(spec=SegmentationResult)
+    mock_meningioma_svc.predict.return_value = MagicMock(spec=SegmentationResult)
+
+    router = InferenceRouter(
+        glioma_service=mock_glioma_svc,
+        meningioma_service=mock_meningioma_svc,
+    )
+
+    dummy_glioma_input = np.zeros((4, 64, 64, 64), dtype=np.float32)
+    dummy_men_input = np.zeros((4, 64, 64, 64), dtype=np.float32)
+
+    # 1. Route Glioma
+    router.route(tumor_type="glioma", input_data=dummy_glioma_input, request_id="REQ-ISO-GLI")
+    mock_glioma_svc.predict.assert_called_once()
+    mock_meningioma_svc.predict.assert_not_called()
+
+    # Reset mocks
+    mock_glioma_svc.reset_mock()
+    mock_meningioma_svc.reset_mock()
+
+    # 2. Route Meningioma
+    router.route(tumor_type="meningioma", input_data=dummy_men_input, request_id="REQ-ISO-MEN")
+    mock_meningioma_svc.predict.assert_called_once()
+    mock_glioma_svc.predict.assert_not_called()
+
+    # Reset mocks
+    mock_glioma_svc.reset_mock()
+    mock_meningioma_svc.reset_mock()
+
+    # 3. Route Meningioma Multimodal alias
+    router.route(tumor_type="meningioma_multimodal", input_data=dummy_men_input, request_id="REQ-ISO-MULTI")
+    mock_meningioma_svc.predict.assert_called_once()
+    mock_glioma_svc.predict.assert_not_called()
+
+
+def test_router_unexpected_and_duplicate_modalities():
+    """Test 9: Verifies router rejects unexpected and duplicate modalities in dictionary inputs."""
+    router = InferenceRouter(
+        glioma_service=GliomaInferenceService(model=MockGliomaModel()),
+        meningioma_service=MeningiomaMultimodalInferenceService(model=MockMeningiomaModel()),
+    )
+
+    # Glioma: unexpected modality
+    with pytest.raises(ValueError, match="Unexpected modality"):
+        router.route("glioma", {"T1": "a", "T1c": "b", "T2": "c", "FLAIR": "d", "DWI": "e"})
+
+    # Glioma: duplicate modality (T1 and t1n both resolve to T1)
+    with pytest.raises(ValueError, match="Duplicate modality"):
+        router.route("glioma", {"T1": "a", "t1n": "b", "T1c": "c", "T2": "d", "FLAIR": "e"})
+
+    # Meningioma: unexpected modality
+    with pytest.raises(ValueError, match="Unexpected modality"):
+        router.route("meningioma", {"t1n": "a", "t1c": "b", "t2w": "c", "t2f": "d", "PET": "e"})
+
+    # Meningioma: duplicate modality (t1n and T1 both resolve to t1n)
+    with pytest.raises(ValueError, match="Duplicate modality"):
+        router.route("meningioma", {"t1n": "a", "T1": "b", "t1c": "c", "t2w": "d", "t2f": "e"})
+
+
+def test_router_inference_failure_propagation():
+    """Test 10: Verifies router propagates inference runtime errors cleanly."""
+    mock_failing_glioma = MagicMock()
+    mock_failing_glioma.predict.side_effect = RuntimeError("CUDA OOM or model execution failure")
+
+    router = InferenceRouter(glioma_service=mock_failing_glioma)
+    dummy_input = np.zeros((4, 64, 64, 64), dtype=np.float32)
+
+    with pytest.raises(RuntimeError, match="CUDA OOM or model execution failure"):
+        router.route("glioma", dummy_input)

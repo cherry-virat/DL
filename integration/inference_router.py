@@ -44,6 +44,25 @@ from integration.glioma_inference_service import (
 from integration.meningioma_multimodal_service import (
     MeningiomaMultimodalInferenceService,
 )
+from integration.classifier_service import (
+    ClassifierService,
+)
+
+
+class AutomaticClassificationUnavailableError(ValueError):
+    """Raised when automatic classification is requested but trained classifier checkpoints are unavailable."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.details = details or {}
+
+
+class NoTumorDetectedError(ValueError):
+    """Raised when automatic classification detects a healthy brain / no tumor present."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.details = details or {}
 
 
 class InferenceRouter:
@@ -56,10 +75,12 @@ class InferenceRouter:
         glioma_service: Optional[GliomaInferenceService] = None,
         meningioma_service: Optional[Any] = None,
         meningioma_multimodal_service: Optional[MeningiomaMultimodalInferenceService] = None,
+        classifier_service: Optional[ClassifierService] = None,
     ):
         self._glioma_service = glioma_service
         # The sole active meningioma service is 4-channel multimodal
         self._meningioma_service = meningioma_multimodal_service or meningioma_service
+        self._classifier_service = classifier_service
 
     @property
     def glioma_service(self) -> GliomaInferenceService:
@@ -76,6 +97,12 @@ class InferenceRouter:
     @property
     def meningioma_multimodal_service(self) -> MeningiomaMultimodalInferenceService:
         return self.meningioma_service
+
+    @property
+    def classifier_service(self) -> ClassifierService:
+        if self._classifier_service is None:
+            self._classifier_service = ClassifierService()
+        return self._classifier_service
 
     def normalize_tumor_type(self, tumor_type: Union[TumorType, str]) -> TumorType:
         """
@@ -112,6 +139,7 @@ class InferenceRouter:
     ) -> None:
         """
         Validates that the input data format matches the required modalities for the tumor type.
+        Detects and rejects missing, duplicate, or unexpected modalities.
         """
         if input_data is None:
             raise ValueError(f"input_data cannot be None for {tumor_type.value} segmentation.")
@@ -120,7 +148,31 @@ class InferenceRouter:
             # Glioma requires 4 modalities (T1, T1c, T2, FLAIR)
             if isinstance(input_data, dict):
                 required = {"T1", "T1c", "T2", "FLAIR"}
-                missing = required - set(input_data.keys())
+                canonical_keys: Dict[str, str] = {}
+                for k in input_data.keys():
+                    k_clean = str(k).strip()
+                    k_upper = k_clean.upper()
+                    if k_upper in ("T1", "T1N", "T1W"):
+                        canon = "T1"
+                    elif k_upper in ("T1C", "T1CE", "T1-CE", "T1_CE"):
+                        canon = "T1c"
+                    elif k_upper in ("T2", "T2W"):
+                        canon = "T2"
+                    elif k_upper in ("FLAIR", "T2F", "T2-FLAIR", "T2_FLAIR"):
+                        canon = "FLAIR"
+                    else:
+                        raise ValueError(
+                            f"Invalid input for Glioma segmentation. Unexpected modality: '{k}'. "
+                            f"Required modalities: {sorted(list(required))}"
+                        )
+                    if canon in canonical_keys:
+                        raise ValueError(
+                            f"Invalid input for Glioma segmentation. Duplicate modality '{canon}' detected "
+                            f"from keys '{canonical_keys[canon]}' and '{k}'."
+                        )
+                    canonical_keys[canon] = k_clean
+
+                missing = required - set(canonical_keys.keys())
                 if missing:
                     raise ValueError(
                         f"Invalid input for Glioma segmentation. Missing required modalities: {sorted(list(missing))}"
@@ -144,14 +196,35 @@ class InferenceRouter:
             # All Meningioma segmentation requires 4 modalities (t1n, t1c, t2w, t2f)
             if isinstance(input_data, dict):
                 from integration.meningioma_multimodal_service import detect_modality_key, REQUIRED_MODALITIES
-                detected = set()
+                detected: Dict[str, str] = {}
                 for k in input_data.keys():
                     det = detect_modality_key(str(k))
-                    if det:
-                        detected.add(det)
-                    elif str(k).lower().strip() in REQUIRED_MODALITIES:
-                        detected.add(str(k).lower().strip())
-                missing = set(REQUIRED_MODALITIES) - detected
+                    if not det and str(k).lower().strip() in REQUIRED_MODALITIES:
+                        det = str(k).lower().strip()
+                    if not det:
+                        k_upper = str(k).strip().upper()
+                        if k_upper == "T1":
+                            det = "t1n"
+                        elif k_upper == "T1C":
+                            det = "t1c"
+                        elif k_upper == "T2":
+                            det = "t2w"
+                        elif k_upper == "FLAIR":
+                            det = "t2f"
+
+                    if not det:
+                        raise ValueError(
+                            f"Invalid input for Meningioma segmentation. Unexpected modality: '{k}'. "
+                            f"Required modalities: {sorted(list(REQUIRED_MODALITIES))}"
+                        )
+                    if det in detected:
+                        raise ValueError(
+                            f"Invalid input for Meningioma segmentation. Duplicate modality '{det}' detected "
+                            f"from keys '{detected[det]}' and '{k}'."
+                        )
+                    detected[det] = str(k)
+
+                missing = set(REQUIRED_MODALITIES) - set(detected.keys())
                 if missing:
                     raise ValueError(
                         f"Invalid input for Meningioma segmentation. Missing required modalities: {sorted(list(missing))}"
@@ -171,6 +244,13 @@ class InferenceRouter:
                     "Expected directory path, dict of 4 modality paths, or 4D numpy array."
                 )
 
+        elif tumor_type == TumorType.AUTO:
+            if not isinstance(input_data, (dict, np.ndarray, str, Path)):
+                raise TypeError(
+                    f"Unsupported input_data type for automatic routing: {type(input_data).__name__}. "
+                    "Expected directory path, dict of modality paths, or numpy array."
+                )
+
     def route(
         self,
         tumor_type: Union[TumorType, str],
@@ -185,7 +265,7 @@ class InferenceRouter:
         Routes an inference request to the correct frozen ML service.
 
         Parameters:
-            tumor_type: Explicit TumorType enum or string ('glioma', 'meningioma', 'meningioma_multimodal')
+            tumor_type: Explicit TumorType enum or string ('glioma', 'meningioma', 'meningioma_multimodal', 'auto')
             input_data: Modality path(s), directory, or preprocessed array
             request_id: Optional tracking ID
             patient_id: Optional patient identifier
@@ -199,12 +279,67 @@ class InferenceRouter:
         validated_type = self.normalize_tumor_type(tumor_type)
         self.validate_input_for_tumor_type(validated_type, input_data)
 
+        if validated_type == TumorType.AUTO:
+            mod_paths = input_data if isinstance(input_data, dict) else {}
+            classification_result = self.classifier_service.classify(mod_paths)
+            status = classification_result.get("status")
+
+            if status == "automatic_classification_not_available":
+                raise AutomaticClassificationUnavailableError(
+                    message=classification_result.get("reason", "Automatic classification not available."),
+                    details=classification_result,
+                )
+            elif status in ("uncertain_classification", "uncertain_presence"):
+                raise AutomaticClassificationUnavailableError(
+                    message=classification_result.get("reason", "Classification prediction is uncertain. Automatic routing refused."),
+                    details=classification_result,
+                )
+            elif status == "classified_healthy":
+                raise NoTumorDetectedError(
+                    message=classification_result.get(
+                        "recommendation",
+                        "No tumor detected by automated presence detector. Segmentation inference is not indicated for normative healthy-control scans.",
+                    ),
+                    details=classification_result,
+                )
+            elif status == "classified_tumor":
+                predicted_route = classification_result.get("selected_route")
+                if predicted_route in ("glioma", "meningioma", "meningioma_multimodal"):
+                    result = self.route(
+                        tumor_type=predicted_route,
+                        input_data=input_data,
+                        request_id=request_id,
+                        patient_id=patient_id,
+                        session_id=session_id,
+                        save_mask_path=save_mask_path,
+                        **kwargs,
+                    )
+                    # Attach classification provenance to result quality notes
+                    if hasattr(result, "quality_status") and result.quality_status:
+                        result.quality_status.qc_notes = (
+                            f"Automatic routing: {predicted_route} "
+                            f"(presence prob: {classification_result.get('presence_probability')}, "
+                            f"confidence: {classification_result.get('confidence')})"
+                        )
+                    return result
+            raise ValueError(
+                f"Automatic classification could not determine a valid segmentation route: {classification_result.get('reason')}"
+            )
+
         if validated_type == TumorType.GLIOMA:
-            # Normalize dictionary if needed
+            # Canonicalize dictionary keys for standard service consumption
             case_input = input_data
             if isinstance(input_data, dict):
-                # Ensure standard case capitalization
-                case_input = {k: v for k, v in input_data.items()}
+                key_aliases = {
+                    "T1": "T1", "T1N": "T1", "T1W": "T1",
+                    "T1C": "T1c", "T1CE": "T1c", "T1-CE": "T1c", "T1_CE": "T1c",
+                    "T2": "T2", "T2W": "T2",
+                    "FLAIR": "FLAIR", "T2F": "FLAIR", "T2-FLAIR": "FLAIR", "T2_FLAIR": "FLAIR",
+                }
+                case_input = {
+                    key_aliases.get(str(k).strip().upper(), str(k)): v
+                    for k, v in input_data.items()
+                }
             return self.glioma_service.predict(
                 case_input=case_input,
                 request_id=request_id,
@@ -217,8 +352,28 @@ class InferenceRouter:
             )
 
         elif validated_type in (TumorType.MENINGIOMA, TumorType.MENINGIOMA_MULTIMODAL):
+            from integration.meningioma_multimodal_service import detect_modality_key
+            case_input = input_data
+            if isinstance(input_data, dict):
+                case_input = {}
+                for k, v in input_data.items():
+                    det = detect_modality_key(str(k))
+                    if not det:
+                        k_up = str(k).strip().upper()
+                        if k_up == "T1":
+                            det = "t1n"
+                        elif k_up == "T1C":
+                            det = "t1c"
+                        elif k_up == "T2":
+                            det = "t2w"
+                        elif k_up == "FLAIR":
+                            det = "t2f"
+                        else:
+                            det = str(k).strip().lower()
+                    case_input[det] = v
+
             return self.meningioma_service.predict(
-                case_input=input_data,
+                case_input=case_input,
                 request_id=request_id,
                 patient_id=patient_id,
                 session_id=session_id,
@@ -243,4 +398,3 @@ def run_inference(
     """
     active_router = router or InferenceRouter()
     return active_router.route(tumor_type, input_data, **kwargs)
-
