@@ -265,6 +265,10 @@ class GliomaInferenceService:
         # Apply threshold 0.60
         raw_wt_mask = (wt_prob_np >= PROBABILITY_THRESHOLD)
 
+        # Zero-air background masking: suppress false-positive activations in empty air outside the brain
+        brain_mask = np.any(image_4d != 0, axis=0)
+        raw_wt_mask = np.logical_and(raw_wt_mask, brain_mask)
+
         # Apply 3D connected-component post-processing (min_size=1000)
         final_wt_mask, fp_cc_stats = filter_connected_components(
             raw_wt_mask,
