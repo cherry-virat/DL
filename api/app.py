@@ -67,10 +67,10 @@ def validate_request_id(request_id: Optional[str]) -> str:
         raise ValueError("Request ID cannot be empty.")
 
     clean_id = request_id.strip()
-    if clean_id.endswith(".nii.gz"):
-        clean_id = clean_id[:-7]
-    elif clean_id.endswith(".nii"):
-        clean_id = clean_id[:-4]
+    for ext in [".nii.gz", ".nii", ".pdf", ".png", ".csv", ".txt", ".json"]:
+        if clean_id.lower().endswith(ext):
+            clean_id = clean_id[:-len(ext)]
+            break
 
     if not REQUEST_ID_PATTERN.fullmatch(clean_id):
         raise ValueError(
@@ -1725,6 +1725,8 @@ def create_app(router: Optional[InferenceRouter] = None) -> Flask:
     def serve_frontend_static(filename):
         if (FRONTEND_DIR / filename).exists():
             return send_from_directory(FRONTEND_DIR, filename)
+        if filename.startswith("api/"):
+            return jsonify({"detail": f"API endpoint '/{filename}' not found."}), 404
         if (FRONTEND_DIR / "index.html").exists():
             return send_from_directory(FRONTEND_DIR, "index.html")
         return jsonify({"detail": f"File '{filename}' not found."}), 404

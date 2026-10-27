@@ -509,17 +509,7 @@
                     Quantitative Multi-Parametric MRI Classification, 3D Segmentation & Volumetrics
                 </p>
             </div>
-            <div class="device-pill" id="deviceStatus">
-                <span class="dot"></span>
-                <span id="deviceText">Checking API...</span>
-            </div>
         </header>
-
-        <div class="disclaimer-banner">
-            <div>
-                <strong>Investigational Use Notice:</strong> This software is an experimental machine learning system designed for academic and computational research. It has not been evaluated, cleared, or approved by the FDA or CE regulatory authorities and must not be used for primary clinical diagnosis, surgical margin delineation, biopsy targeting, radiation dosing, or treatment planning decisions.
-            </div>
-        </div>
 
         <div class="grid">
             <!-- Left Column: Upload & Controls -->
@@ -696,6 +686,7 @@
 
                         <!-- Genuine 3D Orthogonal Multi-Planar Viewer -->
                         <div class="viewer-container" id="viewerContainer" style="display: none;">
+                            <div id="viewerErrorBox" style="display: none; padding: 10px 14px; margin-bottom: 10px; background: rgba(244, 63, 94, 0.15); border: 1px solid var(--accent-rose); border-radius: 6px; color: #fda4af; font-size: 0.82rem;"></div>
                             <div class="viewer-toolbar">
                                 <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
                                     <span style="font-size: 0.72rem; font-weight: 600; color: var(--accent-blue);">View:</span>
@@ -778,6 +769,10 @@
                 </div>
             </div>
         </div>
+
+        <footer style="margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 0.76rem; line-height: 1.5;">
+            <div><strong>Investigational Research System:</strong> For academic research and technical evaluation only. Not cleared or approved by FDA or CE regulatory authorities. Not intended for clinical diagnosis, patient management, surgical planning, or treatment decisions.</div>
+        </footer>
     </div>
 
     <script>
@@ -794,11 +789,14 @@
         const slotFiles = { T1: null, T1c: null, T2: null, FLAIR: null };
         let slotMapping = {};
 
-        // Niivue Viewer State
+        // Niivue Viewer State & Multi-Case Lifecycle Management
         let nvInstance = null;
         let activeSliceType = 3; // MULTIPLANAR default
         let maskOpacity = 0.65;
         let maskVisible = true;
+        let viewerGenerationToken = 0;
+        let currentViewerRequestId = null;
+        let viewerControlsInitialized = false;
 
         // DOM Elements
         const dropzone = document.getElementById("dropzone");
@@ -899,14 +897,19 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/api/health`);
                 const data = await res.json();
-                document.getElementById("deviceText").textContent = `${data.device_name || 'CPU'} (${(data.device || 'active').toUpperCase()})`;
+                const devText = document.getElementById("deviceText");
+                if (devText) {
+                    devText.textContent = `${data.device_name || 'CPU'} (${(data.device || 'active').toUpperCase()})`;
+                }
                 if (!data.automatic_classification_available) {
                     classifierNotice.style.display = "block";
                     classifierNoticeText.textContent = "Automatic 3D classifier weights are not present on disk. Please select Glioma or Meningioma manually.";
                 }
             } catch (err) {
-                document.getElementById("deviceText").textContent = "API Offline";
-                document.querySelector(".dot").style.backgroundColor = "var(--accent-rose)";
+                const devText = document.getElementById("deviceText");
+                if (devText) devText.textContent = "API Offline";
+                const dot = document.querySelector(".dot");
+                if (dot) dot.style.backgroundColor = "var(--accent-rose)";
             }
         }
         checkHealth();
@@ -923,6 +926,9 @@
         fileInput.onchange = (e) => handleFiles(e.target.files);
 
         function resetResultsUI() {
+            viewerGenerationToken++;
+            currentViewerRequestId = null;
+
             runStatusFeedback.innerHTML = "";
             const classifyFeedback = document.getElementById("classifyFeedback");
             if (classifyFeedback) classifyFeedback.innerHTML = "";
@@ -930,9 +936,20 @@
             document.getElementById("resultsContent").style.display = "none";
             const viewerContainer = document.getElementById("viewerContainer");
             if (viewerContainer) viewerContainer.style.display = "none";
-            if (nvInstance && nvInstance.volumes) {
-                nvInstance.volumes = [];
-                nvInstance.updateGLVolume();
+            const viewerErrorBox = document.getElementById("viewerErrorBox");
+            if (viewerErrorBox) {
+                viewerErrorBox.style.display = "none";
+                viewerErrorBox.textContent = "";
+            }
+            if (nvInstance) {
+                try {
+                    nvInstance.volumes = [];
+                    nvInstance.back = null;
+                    nvInstance.overlays = [];
+                    nvInstance.drawScene();
+                } catch (e) {
+                    console.warn("NiiVue volume reset error:", e);
+                }
             }
             const conflictAlert = document.getElementById("conflictAlert");
             if (conflictAlert) {
@@ -945,9 +962,21 @@
             document.getElementById("resVolMm3").textContent = "-";
             document.getElementById("geometryDetails").innerHTML = "";
             document.getElementById("subregionBody").innerHTML = "";
-            document.getElementById("downloadReportPdfBtn").removeAttribute("href");
-            document.getElementById("downloadPngBtn").removeAttribute("href");
-            document.getElementById("downloadCsvBtn").removeAttribute("href");
+            const pdfBtn = document.getElementById("downloadReportPdfBtn");
+            if (pdfBtn) {
+                pdfBtn.removeAttribute("href");
+                pdfBtn.removeAttribute("download");
+            }
+            const pngBtn = document.getElementById("downloadPngBtn");
+            if (pngBtn) {
+                pngBtn.removeAttribute("href");
+                pngBtn.removeAttribute("download");
+            }
+            const csvBtn = document.getElementById("downloadCsvBtn");
+            if (csvBtn) {
+                csvBtn.removeAttribute("href");
+                csvBtn.removeAttribute("download");
+            }
             document.getElementById("downloadMultiBtn").removeAttribute("href");
             document.getElementById("downloadGtvBtn").removeAttribute("href");
             document.getElementById("downloadReportBtn").removeAttribute("href");
@@ -1267,9 +1296,21 @@
             }
 
             // Primary Accessible Downloads
-            document.getElementById("downloadReportPdfBtn").href = `${API_BASE_URL}/api/report/${reqId}?format=pdf`;
-            document.getElementById("downloadPngBtn").href = `${API_BASE_URL}/api/export/png/${reqId}`;
-            document.getElementById("downloadCsvBtn").href = `${API_BASE_URL}/api/export/csv/${reqId}`;
+            const pdfBtn = document.getElementById("downloadReportPdfBtn");
+            if (pdfBtn) {
+                pdfBtn.href = `${API_BASE_URL}/api/report/${reqId}?format=pdf`;
+                pdfBtn.setAttribute("download", `${reqId}_clinical_report.pdf`);
+            }
+            const pngBtn = document.getElementById("downloadPngBtn");
+            if (pngBtn) {
+                pngBtn.href = `${API_BASE_URL}/api/export/png/${reqId}`;
+                pngBtn.setAttribute("download", `${reqId}_segmentation_view.png`);
+            }
+            const csvBtn = document.getElementById("downloadCsvBtn");
+            if (csvBtn) {
+                csvBtn.href = `${API_BASE_URL}/api/export/csv/${reqId}`;
+                csvBtn.setAttribute("download", `${reqId}_volumetrics.csv`);
+            }
 
             // Advanced Research Downloads
             document.getElementById("downloadMultiBtn").href = `${API_BASE_URL}/api/mask/${reqId}?type=multiclass`;
@@ -1279,7 +1320,7 @@
             // JSON View
             document.getElementById("jsonViewer").textContent = JSON.stringify(data, null, 2);
 
-            // Initialize Genuine 3D Niivue Viewer
+            // Initialize Genuine 3D Niivue Viewer with Lifecycle Management
             initNiivueViewer(reqId);
         }
 
@@ -1288,8 +1329,21 @@
             if (!viewerContainer) return;
             viewerContainer.style.display = "block";
 
+            const viewerErrorBox = document.getElementById("viewerErrorBox");
+            if (viewerErrorBox) {
+                viewerErrorBox.style.display = "none";
+                viewerErrorBox.textContent = "";
+            }
+
+            const token = ++viewerGenerationToken;
+            currentViewerRequestId = reqId;
+
             if (!window.niivue || !window.niivue.Niivue) {
                 console.warn("Niivue library not loaded.");
+                if (viewerErrorBox) {
+                    viewerErrorBox.textContent = "3D Viewer library (NiiVue) failed to load. Please verify your connection or inspect static asset niivue.umd.js.";
+                    viewerErrorBox.style.display = "block";
+                }
                 return;
             }
 
@@ -1331,10 +1385,19 @@
                 };
             }
 
-            setupViewerControls();
+            if (!viewerControlsInitialized) {
+                setupViewerControls();
+                viewerControlsInitialized = true;
+            }
 
             try {
-                // Supply URLs and explicit .nii.gz names so Niivue triggers NIfTI decoding
+                nvInstance.resizeListener();
+            } catch (e) {
+                console.warn("Resize error:", e);
+            }
+
+            try {
+                // Supply URLs and explicit unique .nii.gz names per request so Niivue decodes freshly
                 const bgUrl = `${API_BASE_URL}/api/volume/${reqId}.nii.gz`;
                 const maskUrl = `${API_BASE_URL}/api/mask/${reqId}.nii.gz?type=multiclass`;
 
@@ -1343,21 +1406,36 @@
                         url: bgUrl,
                         colormap: "gray",
                         opacity: 1.0,
-                        name: "structural.nii.gz",
+                        name: `structural_${reqId}.nii.gz`,
                     },
                     {
                         url: maskUrl,
                         colormap: "actc",
                         opacity: maskOpacity,
-                        name: "segmentation_mask.nii.gz",
+                        name: `segmentation_mask_${reqId}.nii.gz`,
                     }
                 ];
 
                 await nvInstance.loadVolumes(volumeList);
+
+                // Cancel stale generation
+                if (token !== viewerGenerationToken || reqId !== currentViewerRequestId) {
+                    console.log(`Discarding stale NiiVue render for token ${token}`);
+                    return;
+                }
+
                 nvInstance.setSliceType(activeSliceType);
                 nvInstance.updateGLVolume();
+                nvInstance.resizeListener();
+                nvInstance.drawScene();
             } catch (err) {
                 console.error("Failed to load volumes in Niivue:", err);
+                if (token === viewerGenerationToken) {
+                    if (viewerErrorBox) {
+                        viewerErrorBox.textContent = `Unable to render 3D NiiVue view: ${err.message || "Failed to load MRI volume or mask"}. You can still download the 3D NIfTI masks or 2D PNG slice view.`;
+                        viewerErrorBox.style.display = "block";
+                    }
+                }
             }
         }
 

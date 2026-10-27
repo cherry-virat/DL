@@ -197,3 +197,94 @@ def test_cross_case_isolation(test_client, tmp_path):
         import shutil
         shutil.rmtree(dir_a, ignore_errors=True)
         shutil.rmtree(dir_b, ignore_errors=True)
+
+
+def test_export_endpoints_with_file_extensions(test_client, mock_case_dir):
+    """Verifies that requesting /api/export/<format>/<id>.<ext> gracefully strips suffix."""
+    req_id = "REQ-TESTEXPORT"
+    res_pdf = test_client.get(f"/api/export/pdf/{req_id}.pdf")
+    assert res_pdf.status_code == 200
+    assert res_pdf.content_type == "application/pdf"
+    assert res_pdf.data.startswith(b"%PDF-")
+
+    res_csv = test_client.get(f"/api/export/csv/{req_id}.csv")
+    assert res_csv.status_code == 200
+    assert "text/csv" in res_csv.content_type
+    assert req_id in res_csv.get_data(as_text=True)
+
+    res_png = test_client.get(f"/api/export/png/{req_id}.png")
+    assert res_png.status_code == 200
+    assert res_png.content_type == "image/png"
+    assert res_png.data.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_api_nonexistent_route_returns_json_not_html(test_client):
+    """Ensures invalid or misspelled /api/ routes return 404 JSON and never fall through to index.html."""
+    res = test_client.get("/api/export/nonexistent_format/REQ-123")
+    assert res.status_code == 404
+    assert res.is_json
+    data = res.get_json()
+    assert "detail" in data
+    assert "not found" in data["detail"].lower()
+
+
+def test_two_case_sequential_export_workflow(test_client, tmp_path):
+    """Simulates sequential Case A -> Case B lifecycle ensuring clean separation and complete payloads."""
+    case_1 = "REQ-SEQ-CASE1"
+    case_2 = "REQ-SEQ-CASE2"
+    dir_1 = API_RUNS_DIR / case_1
+    dir_2 = API_RUNS_DIR / case_2
+    dir_1.mkdir(parents=True, exist_ok=True)
+    dir_2.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Case 1 setup
+        with open(dir_1 / "result.json", "w", encoding="utf-8") as f:
+            json.dump({
+                "request": {"request_id": case_1, "tumor_type": "meningioma", "selected_model": "meningioma"},
+                "volumetrics": {"total_tumor_volume_mm3": 15000.0, "total_tumor_volume_cm3": 15.0},
+                "meningioma_measurements": {
+                    "subregion_volumes": {
+                        "wt_volume_mm3": 15000.0, "wt_volume_cm3": 15.0,
+                        "et_volume_mm3": 5000.0, "et_volume_cm3": 5.0,
+                        "ncr_volume_mm3": 2000.0, "ncr_volume_cm3": 2.0,
+                        "ed_volume_mm3": 8000.0, "ed_volume_cm3": 8.0,
+                    }
+                }
+            }, f)
+
+        # Retrieve Case 1 PDF and CSV
+        pdf_1 = test_client.get(f"/api/export/pdf/{case_1}")
+        assert pdf_1.status_code == 200
+        assert pdf_1.data.startswith(b"%PDF-")
+        csv_1 = test_client.get(f"/api/export/csv/{case_1}").get_data(as_text=True)
+        assert case_1 in csv_1
+        assert "15000.0" in csv_1
+
+        # Case 2 setup (Simulating new case started after Case 1)
+        with open(dir_2 / "result.json", "w", encoding="utf-8") as f:
+            json.dump({
+                "request": {"request_id": case_2, "tumor_type": "glioma", "selected_model": "glioma"},
+                "volumetrics": {"total_tumor_volume_mm3": 35000.0, "total_tumor_volume_cm3": 35.0},
+                "glioma_measurements": {
+                    "subregion_volumes": {
+                        "wt_volume_mm3": 35000.0, "wt_volume_cm3": 35.0,
+                        "tc_volume_mm3": 12000.0, "tc_volume_cm3": 12.0,
+                        "et_volume_mm3": 9000.0, "et_volume_cm3": 9.0,
+                    }
+                }
+            }, f)
+
+        # Retrieve Case 2 PDF and CSV
+        pdf_2 = test_client.get(f"/api/export/pdf/{case_2}")
+        assert pdf_2.status_code == 200
+        assert pdf_2.data.startswith(b"%PDF-")
+        csv_2 = test_client.get(f"/api/export/csv/{case_2}").get_data(as_text=True)
+        assert case_2 in csv_2
+        assert "35000.0" in csv_2
+        assert case_1 not in csv_2
+
+    finally:
+        import shutil
+        shutil.rmtree(dir_1, ignore_errors=True)
+        shutil.rmtree(dir_2, ignore_errors=True)
