@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Brain Tumor MRI Detection, Segmentation & Volumetrics</title>
+    <meta name="application-name" content="3D Brain Tumor MRI Segmentation Prototype">
+    <title>3D Brain MRI Analysis</title>
     <style>
         :root {
             --bg-primary: #0f172a;
@@ -502,11 +503,10 @@
         <header>
             <div class="title-group">
                 <h1>
-                    <span>🧠 3D Brain Tumor MRI Segmentation Prototype</span>
-                    <span class="badge-research">Research Prototype</span>
+                    <span>3D Brain MRI Analysis</span>
                 </h1>
                 <p style="color: var(--text-secondary); font-size: 0.84rem; margin-top: 4px;">
-                    Hierarchical Presence Detection, Glioma vs. Meningioma Classification, and Multimodal 3D U-Net Inference
+                    Quantitative Multi-Parametric MRI Classification, 3D Segmentation & Volumetrics
                 </p>
             </div>
             <div class="device-pill" id="deviceStatus">
@@ -516,9 +516,8 @@
         </header>
 
         <div class="disclaimer-banner">
-            <span style="font-size: 1.1rem; line-height: 1;">⚠️</span>
             <div>
-                <strong>Investigational Research Scope:</strong> This application is an experimental machine learning research prototype. It has NOT been evaluated, cleared, or approved by the FDA or CE regulatory authorities. It must NOT be used for primary clinical diagnosis, surgical margin delineation, or patient treatment decisions.
+                <strong>Investigational Use Notice:</strong> This software is an experimental machine learning system designed for academic and computational research. It has not been evaluated, cleared, or approved by the FDA or CE regulatory authorities and must not be used for primary clinical diagnosis, surgical margin delineation, biopsy targeting, radiation dosing, or treatment planning decisions.
             </div>
         </div>
 
@@ -731,16 +730,38 @@
                             </div>
                         </div>
 
-                        <div class="btn-group" style="margin-top: 20px;">
-                            <a class="btn" id="downloadMultiBtn" target="_blank">
-                                <span>📥 Multiclass Mask (.nii.gz)</span>
+                        <div class="btn-group" style="margin-top: 20px; gap: 8px;">
+                            <a class="btn" id="downloadReportPdfBtn" target="_blank" style="background: var(--accent-blue); color: #0f172a; font-weight: 600;">
+                                <span>Download Report (PDF)</span>
                             </a>
-                            <a class="btn btn-outline" id="downloadGtvBtn" target="_blank">
-                                <span>📥 Binary GTV (.nii.gz)</span>
+                            <a class="btn btn-outline" id="downloadPngBtn" target="_blank">
+                                <span>Download Segmentation View (PNG)</span>
                             </a>
-                            <a class="btn btn-outline" id="downloadReportBtn" target="_blank">
-                                <span>📄 Clinical Report (.txt)</span>
+                            <a class="btn btn-outline" id="downloadCsvBtn" target="_blank">
+                                <span>Download Volume Summary (CSV)</span>
                             </a>
+                        </div>
+                        <p style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 8px;">
+                            Note: PNG export shows a 2D axial slice cross-section at maximal tumor burden. Does not represent the complete 3D volumetric mask.
+                        </p>
+
+                        <!-- Advanced Research Formats Accordion -->
+                        <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                            <div style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleAdvancedDownloads()">
+                                <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Advanced Research Formats (3D NIfTI & Text)</span>
+                                <span id="advToggleIcon" style="font-size: 0.75rem; color: var(--text-secondary);">▼ View</span>
+                            </div>
+                            <div id="advancedDownloadsPanel" style="display: none; margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+                                <a class="btn btn-outline" id="downloadMultiBtn" target="_blank" style="font-size: 0.78rem; padding: 6px 12px;">
+                                    <span>3D Multiclass Mask (.nii.gz)</span>
+                                </a>
+                                <a class="btn btn-outline" id="downloadGtvBtn" target="_blank" style="font-size: 0.78rem; padding: 6px 12px;">
+                                    <span>3D Binary GTV (.nii.gz)</span>
+                                </a>
+                                <a class="btn btn-outline" id="downloadReportBtn" target="_blank" style="font-size: 0.78rem; padding: 6px 12px;">
+                                    <span>Text Summary (.txt)</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -924,6 +945,9 @@
             document.getElementById("resVolMm3").textContent = "-";
             document.getElementById("geometryDetails").innerHTML = "";
             document.getElementById("subregionBody").innerHTML = "";
+            document.getElementById("downloadReportPdfBtn").removeAttribute("href");
+            document.getElementById("downloadPngBtn").removeAttribute("href");
+            document.getElementById("downloadCsvBtn").removeAttribute("href");
             document.getElementById("downloadMultiBtn").removeAttribute("href");
             document.getElementById("downloadGtvBtn").removeAttribute("href");
             document.getElementById("downloadReportBtn").removeAttribute("href");
@@ -1242,7 +1266,12 @@
                 `;
             }
 
-            // Download Links
+            // Primary Accessible Downloads
+            document.getElementById("downloadReportPdfBtn").href = `${API_BASE_URL}/api/report/${reqId}?format=pdf`;
+            document.getElementById("downloadPngBtn").href = `${API_BASE_URL}/api/export/png/${reqId}`;
+            document.getElementById("downloadCsvBtn").href = `${API_BASE_URL}/api/export/csv/${reqId}`;
+
+            // Advanced Research Downloads
             document.getElementById("downloadMultiBtn").href = `${API_BASE_URL}/api/mask/${reqId}?type=multiclass`;
             document.getElementById("downloadGtvBtn").href = `${API_BASE_URL}/api/mask/${reqId}?type=gtv`;
             document.getElementById("downloadReportBtn").href = `${API_BASE_URL}/api/report/${reqId}?download=1`;
@@ -1403,6 +1432,18 @@
                 icon.textContent = "▲ Hide";
             } else {
                 container.style.display = "none";
+                icon.textContent = "▼ View";
+            }
+        }
+
+        function toggleAdvancedDownloads() {
+            const panel = document.getElementById("advancedDownloadsPanel");
+            const icon = document.getElementById("advToggleIcon");
+            if (panel.style.display === "none" || panel.style.display === "") {
+                panel.style.display = "flex";
+                icon.textContent = "▲ Hide";
+            } else {
+                panel.style.display = "none";
                 icon.textContent = "▼ View";
             }
         }

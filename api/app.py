@@ -1151,6 +1151,54 @@ def create_app(router: Optional[InferenceRouter] = None) -> Flask:
         with open(result_path, "r", encoding="utf-8") as f:
             res_data = json.load(f)
 
+        report_format = request.args.get("format", "").lower()
+        if report_format == "pdf":
+            cls_data = None
+            cls_path = req_dir / "classification.json"
+            if cls_path.exists():
+                try:
+                    with open(cls_path, "r", encoding="utf-8") as f_cls:
+                        cls_data = json.load(f_cls)
+                except Exception:
+                    pass
+            from api.pdf_report import generate_pdf_report
+            pdf_bytes = generate_pdf_report(res_data, clean_id, cls_data)
+            req_meta = res_data.get("request_metadata") or res_data.get("request", {})
+            tumor_type_pdf = str(req_meta.get("tumor_type", res_data.get("status", "report"))).lower()
+            return Response(
+                pdf_bytes,
+                mimetype="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type_pdf}_report.pdf"},
+            )
+        elif report_format == "csv":
+            cls_data = None
+            cls_path = req_dir / "classification.json"
+            if cls_path.exists():
+                try:
+                    with open(cls_path, "r", encoding="utf-8") as f_cls:
+                        cls_data = json.load(f_cls)
+                except Exception:
+                    pass
+            from api.export_utils import generate_csv_report
+            csv_text = generate_csv_report(res_data, clean_id, cls_data)
+            req_meta = res_data.get("request_metadata") or res_data.get("request", {})
+            tumor_type_csv = str(req_meta.get("tumor_type", "tumor")).lower()
+            return Response(
+                csv_text,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type_csv}_volumetrics.csv"},
+            )
+        elif report_format == "png":
+            from api.export_utils import generate_segmentation_png
+            png_bytes = generate_segmentation_png(res_data, clean_id, API_RUNS_DIR)
+            req_meta = res_data.get("request_metadata") or res_data.get("request", {})
+            tumor_type_png = str(req_meta.get("tumor_type", "tumor")).lower()
+            return Response(
+                png_bytes,
+                mimetype="image/png",
+                headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type_png}_segmentation_view.png"},
+            )
+
         # Handle early-exit results (healthy scan or uncertain classification)
         res_status = res_data.get("status")
         if res_status == "no_tumor_detected":
@@ -1355,6 +1403,134 @@ def create_app(router: Optional[InferenceRouter] = None) -> Flask:
                 headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type}_report.txt"},
             )
         return Response(report_text, mimetype="text/plain; charset=utf-8")
+
+    @app.route("/api/report/<request_id>/pdf", methods=["GET"])
+    def get_clinical_report_pdf(request_id: str):
+        """
+        Direct dedicated endpoint to stream and download patient clinical report in PDF format.
+        """
+        try:
+            clean_id = validate_request_id(request_id)
+        except ValueError as val_err:
+            return jsonify({"detail": str(val_err)}), 400
+
+        req_dir = API_RUNS_DIR / clean_id
+        if not req_dir.exists():
+            return jsonify({"detail": f"Results not found for request ID '{clean_id}'."}), 404
+
+        requested_type_raw = request.args.get("tumor_type") or request.args.get("model")
+        if requested_type_raw:
+            clean_req = requested_type_raw.lower().strip()
+            canonical_key = normalize_model_name(clean_req)
+            candidate_paths = [
+                req_dir / f"result_{clean_req}.json",
+                req_dir / f"result_{canonical_key}.json" if canonical_key else None,
+            ]
+            result_path = None
+            for p in candidate_paths:
+                if p and p.exists():
+                    result_path = p
+                    break
+            if not result_path:
+                return jsonify({"detail": f"No {clean_req} report found for request ID '{clean_id}'."}), 404
+        else:
+            result_path = req_dir / "result.json"
+            if not result_path.exists():
+                return jsonify({"detail": f"Results not found for request ID '{clean_id}'."}), 404
+
+        with open(result_path, "r", encoding="utf-8") as f:
+            res_data = json.load(f)
+
+        cls_data = None
+        cls_path = req_dir / "classification.json"
+        if cls_path.exists():
+            try:
+                with open(cls_path, "r", encoding="utf-8") as f_cls:
+                    cls_data = json.load(f_cls)
+            except Exception:
+                pass
+
+        from api.pdf_report import generate_pdf_report
+        pdf_bytes = generate_pdf_report(res_data, clean_id, cls_data)
+        req_meta = res_data.get("request_metadata") or res_data.get("request", {})
+        tumor_type_pdf = str(req_meta.get("tumor_type", res_data.get("status", "report"))).lower()
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type_pdf}_report.pdf"},
+        )
+
+    @app.route("/api/export/pdf/<request_id>", methods=["GET"])
+    def export_report_pdf(request_id: str):
+        """Dedicated export endpoint for patient PDF report."""
+        return get_clinical_report_pdf(request_id)
+
+    @app.route("/api/export/csv/<request_id>", methods=["GET"])
+    def export_volumetrics_csv(request_id: str):
+        """Dedicated endpoint to stream and download patient volume summary in CSV format."""
+        try:
+            clean_id = validate_request_id(request_id)
+        except ValueError as val_err:
+            return jsonify({"detail": str(val_err)}), 400
+
+        req_dir = API_RUNS_DIR / clean_id
+        if not req_dir.exists():
+            return jsonify({"detail": f"Results not found for request ID '{clean_id}'."}), 404
+
+        result_path = req_dir / "result.json"
+        if not result_path.exists():
+            return jsonify({"detail": f"Results not found for request ID '{clean_id}'."}), 404
+
+        with open(result_path, "r", encoding="utf-8") as f:
+            res_data = json.load(f)
+
+        cls_data = None
+        cls_path = req_dir / "classification.json"
+        if cls_path.exists():
+            try:
+                with open(cls_path, "r", encoding="utf-8") as f_cls:
+                    cls_data = json.load(f_cls)
+            except Exception:
+                pass
+
+        from api.export_utils import generate_csv_report
+        csv_text = generate_csv_report(res_data, clean_id, cls_data)
+        req_meta = res_data.get("request_metadata") or res_data.get("request", {})
+        tumor_type_csv = str(req_meta.get("tumor_type", "tumor")).lower()
+        return Response(
+            csv_text,
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type_csv}_volumetrics.csv"},
+        )
+
+    @app.route("/api/export/png/<request_id>", methods=["GET"])
+    def export_segmentation_png(request_id: str):
+        """Dedicated endpoint to stream and download representative 2D axial segmentation view in PNG format."""
+        try:
+            clean_id = validate_request_id(request_id)
+        except ValueError as val_err:
+            return jsonify({"detail": str(val_err)}), 400
+
+        req_dir = API_RUNS_DIR / clean_id
+        if not req_dir.exists():
+            return jsonify({"detail": f"Results not found for request ID '{clean_id}'."}), 404
+
+        result_path = req_dir / "result.json"
+        if not result_path.exists():
+            return jsonify({"detail": f"Results not found for request ID '{clean_id}'."}), 404
+
+        with open(result_path, "r", encoding="utf-8") as f:
+            res_data = json.load(f)
+
+        from api.export_utils import generate_segmentation_png
+        png_bytes = generate_segmentation_png(res_data, clean_id, API_RUNS_DIR)
+        req_meta = res_data.get("request_metadata") or res_data.get("request", {})
+        tumor_type_png = str(req_meta.get("tumor_type", "tumor")).lower()
+        return Response(
+            png_bytes,
+            mimetype="image/png",
+            headers={"Content-Disposition": f"attachment; filename={clean_id}_{tumor_type_png}_segmentation_view.png"},
+        )
 
     @app.route("/api/mask/<request_id>", methods=["GET"])
     def download_mask(request_id: str):
