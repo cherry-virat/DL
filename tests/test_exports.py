@@ -288,3 +288,106 @@ def test_two_case_sequential_export_workflow(test_client, tmp_path):
         import shutil
         shutil.rmtree(dir_1, ignore_errors=True)
         shutil.rmtree(dir_2, ignore_errors=True)
+
+
+def test_frontend_upload_slots_and_inline_notices_removed():
+    """Verifies frontend HTML does not contain custom slot upload tabs or intrusive routine notices."""
+    html_path = Path("frontend/index.html")
+    assert html_path.exists()
+    content = html_path.read_text(encoding="utf-8")
+
+    # Slots UI and tabs must be absent
+    assert "tabSlotsBtn" not in content
+    assert "slotsUploadPanel" not in content
+    assert "slotT1Box" not in content
+    assert "slotT1cBox" not in content
+    assert "slotT2Box" not in content
+    assert "slotFlairBox" not in content
+
+    # Single batch upload panel present
+    assert "batchUploadPanel" in content
+    assert "detectModalityClient" in content
+
+    # Inline routine notice block must be removed (only conflict alerts retained)
+    assert "meta.diagnostic_notice" not in content
+
+
+def test_pdf_and_csv_pathology_awareness_and_clean_exports(test_client, tmp_path):
+    """Verifies that PDF, PNG, and CSV exports exclude regulatory disclaimers and strictly output pathology-specific metrics."""
+    glioma_case = "REQ-GLI-CLEAN"
+    dir_gli = API_RUNS_DIR / glioma_case
+    dir_gli.mkdir(parents=True, exist_ok=True)
+
+    try:
+        payload = {
+            "request": {
+                "request_id": glioma_case,
+                "tumor_type": "glioma",
+                "selected_model": "glioma",
+                "routing_mode": "automatic_classification",
+                "manual_override": False,
+                "conflict_detected": False,
+            },
+            "input_metadata": {
+                "original_shape": [240, 240, 155],
+                "original_spacing": [1.0, 1.0, 1.0],
+                "voxel_volume_mm3": 1.0,
+                "modality_names": ["T1", "T1c", "T2", "FLAIR"],
+            },
+            "volumetrics": {
+                "total_tumor_voxels": 42000,
+                "total_tumor_volume_mm3": 42000.0,
+                "total_tumor_volume_cm3": 42.0,
+            },
+            "glioma_measurements": {
+                "subregions": {
+                    "wt_voxels": 42000,
+                    "wt_volume_mm3": 42000.0,
+                    "wt_volume_cm3": 42.0,
+                    "tc_voxels": 14000,
+                    "tc_volume_mm3": 14000.0,
+                    "tc_volume_cm3": 14.0,
+                    "et_voxels": 6000,
+                    "et_volume_mm3": 6000.0,
+                    "et_volume_cm3": 6.0,
+                    "ncr_net_voxels": 8000,
+                    "ncr_net_volume_mm3": 8000.0,
+                    "ncr_net_volume_cm3": 8.0,
+                    "edema_voxels": 28000,
+                    "edema_volume_mm3": 28000.0,
+                    "edema_volume_cm3": 28.0,
+                }
+            },
+            "quality_status": {
+                "status": "success",
+                "checkpoint_used": "checkpoints/glioma_best.pth",
+                "qc_verdict": "PASS",
+            },
+        }
+
+        with open(dir_gli / "result.json", "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+
+        # 1. Verify CSV content
+        csv_resp = test_client.get(f"/api/export/csv/{glioma_case}")
+        assert csv_resp.status_code == 200
+        csv_text = csv_resp.get_data(as_text=True)
+
+        assert "Whole_Tumor_WT" in csv_text
+        assert "Tumor_Core_TC" in csv_text
+        assert "Enhancing_Tumor_ET" in csv_text
+        assert "Necrotic_Core_NCR" in csv_text
+        assert "Peritumoral_Edema_ED" in csv_text
+        assert "Gross_Tumor_Volume_GTV" not in csv_text  # Meningioma-only metric absent
+        assert "Investigational Research Prototype Only" not in csv_text
+
+        # 2. Verify PDF generation and disclaimer removal
+        pdf_resp = test_client.get(f"/api/export/pdf/{glioma_case}")
+        assert pdf_resp.status_code == 200
+        assert pdf_resp.data.startswith(b"%PDF-")
+        # Ensure the disclaimer section heading is absent
+        assert b"RESEARCH PROTOTYPE NOTICE & REGULATORY DISCLAIMER" not in pdf_resp.data
+
+    finally:
+        import shutil
+        shutil.rmtree(dir_gli, ignore_errors=True)

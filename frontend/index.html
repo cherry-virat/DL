@@ -135,32 +135,6 @@
             justify-content: space-between;
         }
 
-        /* Upload Tab System */
-        .tab-group {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 14px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 6px 14px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: var(--radius-md);
-            transition: all 0.2s;
-        }
-
-        .tab-btn.active {
-            background: var(--bg-tertiary);
-            color: var(--accent-blue);
-        }
-
         .upload-dropzone {
             border: 2px dashed var(--border-color);
             border-radius: var(--radius-md);
@@ -192,64 +166,6 @@
             border-radius: 4px;
             margin-bottom: 6px;
             border: 1px solid var(--border-color);
-        }
-
-        /* 4 Modality Slots Grid */
-        .slots-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 14px;
-        }
-
-        .slot-box {
-            border: 1.5px dashed var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 12px;
-            background: var(--bg-primary);
-            cursor: pointer;
-            transition: border-color 0.2s, background-color 0.2s;
-            min-height: 78px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .slot-box:hover {
-            border-color: var(--accent-blue);
-            background: rgba(56, 189, 248, 0.05);
-        }
-
-        .slot-box.filled {
-            border-color: var(--accent-green);
-            border-style: solid;
-            background: rgba(52, 211, 153, 0.05);
-        }
-
-        .slot-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .slot-name {
-            color: var(--text-primary);
-        }
-
-        .slot-status {
-            font-size: 0.72rem;
-            color: var(--text-secondary);
-        }
-
-        .slot-filename {
-            font-size: 0.75rem;
-            color: var(--accent-blue);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            margin-top: 4px;
         }
 
         /* Buttons */
@@ -521,60 +437,14 @@
                         <span style="font-size: 0.78rem; color: var(--text-secondary);">4 modalities required</span>
                     </div>
 
-                    <div class="tab-group">
-                        <button class="tab-btn active" id="tabBatchBtn" type="button">📁 Batch Upload (Auto-Detect)</button>
-                        <button class="tab-btn" id="tabSlotsBtn" type="button">🎯 4 Modality Slots (Custom Names)</button>
-                    </div>
-
-                    <!-- Mode A: Batch Drag & Drop -->
+                    <!-- Batch Drag & Drop Upload -->
                     <div id="batchUploadPanel">
                         <div class="upload-dropzone" id="dropzone">
-                            <p style="font-weight: 600; margin-bottom: 5px;">Drag & Drop NIfTI files (.nii, .nii.gz) here</p>
-                            <p style="font-size: 0.78rem; color: var(--text-secondary);">Select 4 files corresponding to T1, T1c, T2, and FLAIR</p>
+                            <p style="font-weight: 600; margin-bottom: 5px;">Drag & Drop 4 NIfTI files (.nii, .nii.gz) here</p>
+                            <p style="font-size: 0.78rem; color: var(--text-secondary);">Select or drop all 4 sequences together: T1, T1c, T2, and FLAIR</p>
                             <input type="file" id="fileInput" multiple accept=".nii,.nii.gz" style="display: none;">
                         </div>
                         <div id="fileList" class="file-list"></div>
-                    </div>
-
-                    <!-- Mode B: Explicit 4 Slots -->
-                    <div id="slotsUploadPanel" style="display: none;">
-                        <p style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 10px;">
-                            Assign custom filenames to exact channels. Overrides automatic regex detection.
-                        </p>
-                        <div class="slots-grid">
-                            <div class="slot-box" id="slotT1Box">
-                                <div class="slot-header">
-                                    <span class="slot-name">1. T1 Native (t1n)</span>
-                                    <span class="slot-status" id="slotT1Status">Empty</span>
-                                </div>
-                                <div class="slot-filename" id="slotT1Name">Click or drop file</div>
-                                <input type="file" id="slotT1Input" accept=".nii,.nii.gz" style="display: none;">
-                            </div>
-                            <div class="slot-box" id="slotT1cBox">
-                                <div class="slot-header">
-                                    <span class="slot-name">2. T1 Contrast (t1c)</span>
-                                    <span class="slot-status" id="slotT1cStatus">Empty</span>
-                                </div>
-                                <div class="slot-filename" id="slotT1cName">Click or drop file</div>
-                                <input type="file" id="slotT1cInput" accept=".nii,.nii.gz" style="display: none;">
-                            </div>
-                            <div class="slot-box" id="slotT2Box">
-                                <div class="slot-header">
-                                    <span class="slot-name">3. T2 Weighted (t2w)</span>
-                                    <span class="slot-status" id="slotT2Status">Empty</span>
-                                </div>
-                                <div class="slot-filename" id="slotT2Name">Click or drop file</div>
-                                <input type="file" id="slotT2Input" accept=".nii,.nii.gz" style="display: none;">
-                            </div>
-                            <div class="slot-box" id="slotFlairBox">
-                                <div class="slot-header">
-                                    <span class="slot-name">4. FLAIR (t2f)</span>
-                                    <span class="slot-status" id="slotFlairStatus">Empty</span>
-                                </div>
-                                <div class="slot-filename" id="slotFlairName">Click or drop file</div>
-                                <input type="file" id="slotFlairInput" accept=".nii,.nii.gz" style="display: none;">
-                            </div>
-                        </div>
                     </div>
 
                     <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
@@ -786,11 +656,6 @@
         let activeTumorType = "auto";
         let detectedModalities = {};
 
-        // Modality Slots State
-        let uploadMode = "batch"; // "batch" | "slots"
-        const slotFiles = { T1: null, T1c: null, T2: null, FLAIR: null };
-        let slotMapping = {};
-
         // Niivue Viewer State & Multi-Case Lifecycle Management
         let nvInstance = null;
         let activeSliceType = 3; // MULTIPLANAR default
@@ -819,6 +684,26 @@
             }
         }
 
+        // Modality Identification Helper
+        function detectModalityClient(filename) {
+            if (!filename) return null;
+            const fn = filename.toLowerCase();
+            if (fn.includes("seg") || fn.includes("mask") || fn.includes("gtv")) return null;
+            if (fn.includes("t1c") || fn.includes("t1ce") || fn.includes("t1_ce") || fn.includes("t1-ce")) {
+                return { key: "T1c", label: "T1 Contrast (t1c)" };
+            }
+            if (fn.includes("flair") || fn.includes("t2f") || fn.includes("t2-flair") || fn.includes("t2_flair")) {
+                return { key: "FLAIR", label: "FLAIR (t2f)" };
+            }
+            if (fn.includes("t2w") || fn.includes("t2")) {
+                return { key: "T2", label: "T2 Weighted (t2w)" };
+            }
+            if (fn.includes("t1n") || fn.includes("t1w") || fn.includes("t1")) {
+                return { key: "T1", label: "T1 Native (t1n)" };
+            }
+            return null;
+        }
+
         // DOM Elements
         const dropzone = document.getElementById("dropzone");
         const fileInput = document.getElementById("fileInput");
@@ -831,87 +716,6 @@
         const classifierNotice = document.getElementById("classifierNotice");
         const classifierNoticeText = document.getElementById("classifierNoticeText");
         const runStatusFeedback = document.getElementById("runStatusFeedback");
-
-        // Tab Elements
-        const tabBatchBtn = document.getElementById("tabBatchBtn");
-        const tabSlotsBtn = document.getElementById("tabSlotsBtn");
-        const batchUploadPanel = document.getElementById("batchUploadPanel");
-        const slotsUploadPanel = document.getElementById("slotsUploadPanel");
-
-        function setUploadMode(mode) {
-            uploadMode = mode;
-            if (mode === "batch") {
-                tabBatchBtn.classList.add("active");
-                tabSlotsBtn.classList.remove("active");
-                batchUploadPanel.style.display = "block";
-                slotsUploadPanel.style.display = "none";
-                uploadBtn.disabled = selectedFiles.length === 0;
-            } else {
-                tabSlotsBtn.classList.add("active");
-                tabBatchBtn.classList.remove("active");
-                batchUploadPanel.style.display = "none";
-                slotsUploadPanel.style.display = "block";
-                checkSlotsReady();
-            }
-        }
-
-        tabBatchBtn.onclick = () => setUploadMode("batch");
-        tabSlotsBtn.onclick = () => setUploadMode("slots");
-
-        // Explicit Modality Slot Handlers
-        const slotConfigs = [
-            { key: "T1", box: "slotT1Box", input: "slotT1Input", status: "slotT1Status", name: "slotT1Name", label: "T1 Native (t1n)" },
-            { key: "T1c", box: "slotT1cBox", input: "slotT1cInput", status: "slotT1cStatus", name: "slotT1cName", label: "T1 Contrast (t1c)" },
-            { key: "T2", box: "slotT2Box", input: "slotT2Input", status: "slotT2Status", name: "slotT2Name", label: "T2 Weighted (t2w)" },
-            { key: "FLAIR", box: "slotFlairBox", input: "slotFlairInput", status: "slotFlairStatus", name: "slotFlairName", label: "FLAIR (t2f)" },
-        ];
-
-        slotConfigs.forEach(cfg => {
-            const boxEl = document.getElementById(cfg.box);
-            const inputEl = document.getElementById(cfg.input);
-
-            boxEl.onclick = () => inputEl.click();
-            boxEl.ondragover = (e) => { e.preventDefault(); boxEl.style.borderColor = "var(--accent-blue)"; };
-            boxEl.ondragleave = () => { boxEl.style.borderColor = slotFiles[cfg.key] ? "var(--accent-green)" : "var(--border-color)"; };
-            boxEl.ondrop = (e) => {
-                e.preventDefault();
-                boxEl.style.borderColor = "var(--border-color)";
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    assignSlotFile(cfg.key, e.dataTransfer.files[0]);
-                }
-            };
-            inputEl.onchange = (e) => {
-                if (e.target.files && e.target.files[0]) {
-                    assignSlotFile(cfg.key, e.target.files[0]);
-                }
-            };
-        });
-
-        function assignSlotFile(key, file) {
-            slotFiles[key] = file;
-            slotMapping[key] = file.name;
-            const cfg = slotConfigs.find(c => c.key === key);
-            if (cfg) {
-                const boxEl = document.getElementById(cfg.box);
-                const statusEl = document.getElementById(cfg.status);
-                const nameEl = document.getElementById(cfg.name);
-                boxEl.classList.add("filled");
-                statusEl.textContent = "✓ Assigned";
-                statusEl.style.color = "var(--accent-green)";
-                nameEl.textContent = `${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
-                nameEl.style.color = "var(--text-primary)";
-            }
-            checkSlotsReady();
-        }
-
-        function checkSlotsReady() {
-            const filledCount = Object.values(slotFiles).filter(f => f !== null).length;
-            if (uploadMode === "slots") {
-                uploadBtn.disabled = filledCount < 4;
-                document.getElementById("uploadStatusText").textContent =
-                    filledCount === 4 ? "All 4 sequences slotted" : `${filledCount} of 4 slotted`;
-            }
-        }
 
         // Initialize API health check
         async function checkHealth() {
@@ -1000,66 +804,94 @@
             selectedFiles = [];
             currentRequestId = null;
             renderFileList();
-            Object.keys(slotFiles).forEach(k => {
-                slotFiles[k] = null;
-                const cfg = slotConfigs.find(c => c.key === k);
-                if (cfg) {
-                    document.getElementById(cfg.box).classList.remove("filled");
-                    document.getElementById(cfg.status).textContent = "Empty";
-                    document.getElementById(cfg.status).style.color = "var(--text-secondary)";
-                    document.getElementById(cfg.name).textContent = "Click or drop file";
-                    document.getElementById(cfg.name).style.color = "var(--accent-blue)";
-                }
-            });
-            slotMapping = {};
             uploadBtn.disabled = true;
             runSegBtn.disabled = true;
             checkClassifyBtn.disabled = true;
             uploadFeedback.innerHTML = "";
-            document.getElementById("uploadStatusText").textContent = "";
+            const statusText = document.getElementById("uploadStatusText");
+            if (statusText) statusText.textContent = "";
         };
 
         function handleFiles(files) {
             resetResultsUI();
             selectedFiles = Array.from(files);
             renderFileList();
-            uploadBtn.disabled = selectedFiles.length === 0;
             uploadFeedback.innerHTML = "";
         }
 
         function renderFileList() {
             fileList.innerHTML = "";
+            const matchedModalities = new Set();
+            let hasUnmatched = false;
+
             selectedFiles.forEach((file) => {
+                const detected = detectModalityClient(file.name);
                 const item = document.createElement("div");
                 item.className = "file-item";
+                
+                let tagHtml = "";
+                if (detected) {
+                    if (matchedModalities.has(detected.key)) {
+                        tagHtml = `<span style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Duplicate ${detected.key}</span>`;
+                    } else {
+                        matchedModalities.add(detected.key);
+                        tagHtml = `<span style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">✓ ${detected.label}</span>`;
+                    }
+                } else {
+                    hasUnmatched = true;
+                    tagHtml = `<span style="background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">⚠️ Unrecognized Modality</span>`;
+                }
+
                 item.innerHTML = `
-                    <span>📄 ${file.name}</span>
-                    <span style="color: var(--text-secondary);">${(file.size / (1024*1024)).toFixed(1)} MB</span>
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📄 ${file.name}</span>
+                        ${tagHtml}
+                    </div>
+                    <span style="color: var(--text-secondary); margin-left: 8px;">${(file.size / (1024*1024)).toFixed(1)} MB</span>
                 `;
                 fileList.appendChild(item);
             });
+
+            const statusText = document.getElementById("uploadStatusText");
+            const required = ["T1", "T1c", "T2", "FLAIR"];
+            const missing = required.filter(k => !matchedModalities.has(k));
+
+            if (selectedFiles.length === 0) {
+                uploadBtn.disabled = true;
+                if (statusText) statusText.textContent = "";
+            } else if (hasUnmatched) {
+                uploadBtn.disabled = true;
+                if (statusText) {
+                    statusText.innerHTML = `<span style="color: var(--accent-rose);">Some filenames could not be matched. Please ensure filenames include t1n, t1c, t2w, or t2f.</span>`;
+                }
+            } else if (missing.length > 0) {
+                uploadBtn.disabled = true;
+                if (statusText) {
+                    statusText.innerHTML = `<span style="color: var(--accent-amber);">${selectedFiles.length}/4 files. Missing: ${missing.join(", ")}</span>`;
+                }
+            } else if (selectedFiles.length === 4 && missing.length === 0) {
+                uploadBtn.disabled = false;
+                if (statusText) {
+                    statusText.innerHTML = `<span style="color: var(--accent-green); font-weight: 600;">✓ All 4 modalities detected (T1, T1c, T2, FLAIR)</span>`;
+                }
+            } else {
+                uploadBtn.disabled = true;
+                if (statusText) {
+                    statusText.innerHTML = `<span style="color: var(--accent-amber);">Expected exactly 4 files (got ${selectedFiles.length})</span>`;
+                }
+            }
         }
 
         // Upload and Validate NIfTI Geometry
         uploadBtn.onclick = async () => {
-            const hasBatchFiles = uploadMode === "batch" && selectedFiles.length > 0;
-            const hasSlotFiles = uploadMode === "slots" && Object.values(slotFiles).filter(f => f !== null).length === 4;
-            if (!hasBatchFiles && !hasSlotFiles) return;
+            if (selectedFiles.length !== 4) return;
 
             resetResultsUI();
             uploadBtn.disabled = true;
             uploadBtn.innerHTML = `<span class="spinner"></span> Uploading...`;
 
             const formData = new FormData();
-            if (uploadMode === "slots") {
-                formData.append("slot_t1", slotFiles["T1"]);
-                formData.append("slot_t1c", slotFiles["T1c"]);
-                formData.append("slot_t2", slotFiles["T2"]);
-                formData.append("slot_flair", slotFiles["FLAIR"]);
-                formData.append("modality_map", JSON.stringify(slotMapping));
-            } else {
-                selectedFiles.forEach(f => formData.append("files", f));
-            }
+            selectedFiles.forEach(f => formData.append("files", f));
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/upload`, { method: "POST", body: formData });
@@ -1070,7 +902,7 @@
                     detectedModalities = data.detected_modalities;
                     uploadFeedback.innerHTML = `
                         <div class="alert alert-success">
-                            ✓ Successfully uploaded and validated <strong>${data.files_count} acquisitions</strong>.<br>
+                            ✓ Successfully uploaded and validated <strong>${data.files_count} acquisitions</strong> (T1, T1c, T2, FLAIR).<br>
                             Request ID: <code>${currentRequestId}</code>
                         </div>
                     `;
@@ -1105,9 +937,6 @@
             classifyFeedback.innerHTML = `<div style="font-size: 0.82rem; color: var(--accent-blue);"><span class="spinner"></span> Probing Stage 1 & Stage 2 classifiers...</div>`;
 
             const reqBody = { request_id: targetReqId };
-            if (uploadMode === "slots" && Object.keys(slotMapping).length === 4) {
-                reqBody.modality_map = slotMapping;
-            }
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/classify`, {
@@ -1180,9 +1009,6 @@
                 request_id: targetReqId,
                 tumor_type: activeTumorType
             };
-            if (uploadMode === "slots" && Object.keys(slotMapping).length === 4) {
-                reqBody.modality_map = slotMapping;
-            }
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/segment`, {
@@ -1251,7 +1077,7 @@
             }
             document.getElementById("resTumorType").textContent = modelTitle;
 
-            // Handle Conflict Notice
+            // Handle Conflict Notice (displayed strictly on manual override disagreements)
             const conflictAlert = document.getElementById("conflictAlert");
             if (conflictAlert) {
                 if (meta.conflict_detected && meta.warning) {
@@ -1259,13 +1085,6 @@
                     conflictAlert.innerHTML = `
                         <div class="alert alert-warning" style="border-left: 4px solid var(--accent-amber); font-weight: 500;">
                             <strong>⚠️ Manual Override Conflict:</strong><br>${meta.warning}
-                        </div>
-                    `;
-                } else if (meta.diagnostic_notice) {
-                    conflictAlert.style.display = "block";
-                    conflictAlert.innerHTML = `
-                        <div class="alert" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: var(--accent-blue); font-size: 0.82rem;">
-                            <strong>ℹ️ Notice:</strong><br>${meta.diagnostic_notice}
                         </div>
                     `;
                 } else {

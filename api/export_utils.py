@@ -83,36 +83,61 @@ def generate_csv_report(res_data: Dict[str, Any], request_id: str, classificatio
         wt_mm3 = sub.get("wt_volume_mm3", tot_mm3)
         tc_mm3 = sub.get("tc_volume_mm3", 0.0)
         et_mm3 = sub.get("et_volume_mm3", 0.0)
-
-        wt_vox = int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox
-        tc_vox = int(tc_mm3 / voxel_vol) if voxel_vol else 0
-        et_vox = int(et_mm3 / voxel_vol) if voxel_vol else 0
-
-        writer.writerow(["Whole_Tumor_WT", wt_vox, f"{wt_mm3:.1f}", f"{wt_mm3/1000.0:.2f}", "100.0%"])
-        writer.writerow(["Tumor_Core_TC", tc_vox, f"{tc_mm3:.1f}", f"{tc_mm3/1000.0:.2f}", f"{(tc_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
-        writer.writerow(["Enhancing_Tumor_ET", et_vox, f"{et_mm3:.1f}", f"{et_mm3/1000.0:.2f}", f"{(et_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
-    elif men_meas:
-        sub = men_meas.get("subregions") or men_meas.get("subregion_volumes") or {}
-        wt_mm3 = sub.get("wt_volume_mm3", tot_mm3)
-        et_mm3 = sub.get("et_volume_mm3", 0.0)
         ncr_mm3 = sub.get("ncr_net_volume_mm3") or sub.get("ncr_volume_mm3", 0.0)
         ed_mm3 = sub.get("edema_volume_mm3") or sub.get("ed_volume_mm3", 0.0)
 
         wt_vox = sub.get("wt_voxels", int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox)
+        tc_vox = sub.get("tc_voxels", int(tc_mm3 / voxel_vol) if voxel_vol else 0)
         et_vox = sub.get("et_voxels", int(et_mm3 / voxel_vol) if voxel_vol else 0)
         ncr_vox = sub.get("ncr_net_voxels") or sub.get("ncr_voxels", int(ncr_mm3 / voxel_vol) if voxel_vol else 0)
         ed_vox = sub.get("edema_voxels") or sub.get("ed_voxels", int(ed_mm3 / voxel_vol) if voxel_vol else 0)
 
+        if voxel_vol:
+            wt_mm3 = wt_vox * voxel_vol
+            tc_mm3 = tc_vox * voxel_vol
+            et_mm3 = et_vox * voxel_vol
+            ncr_mm3 = ncr_vox * voxel_vol
+            ed_mm3 = ed_vox * voxel_vol
+
         writer.writerow(["Whole_Tumor_WT", wt_vox, f"{wt_mm3:.1f}", f"{wt_mm3/1000.0:.2f}", "100.0%"])
+        writer.writerow(["Tumor_Core_TC", tc_vox, f"{tc_mm3:.1f}", f"{tc_mm3/1000.0:.2f}", f"{(tc_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
         writer.writerow(["Enhancing_Tumor_ET", et_vox, f"{et_mm3:.1f}", f"{et_mm3/1000.0:.2f}", f"{(et_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
-        writer.writerow(["Non_Enhancing_Core_NCR", ncr_vox, f"{ncr_mm3:.1f}", f"{ncr_mm3/1000.0:.2f}", f"{(ncr_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
-        writer.writerow(["Peritumoral_Edema_ED", ed_vox, f"{ed_mm3:.1f}", f"{ed_mm3/1000.0:.2f}", f"{(ed_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
+        if ncr_vox > 0 or ncr_mm3 > 0:
+            writer.writerow(["Necrotic_Core_NCR", ncr_vox, f"{ncr_mm3:.1f}", f"{ncr_mm3/1000.0:.2f}", f"{(ncr_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
+        if ed_vox > 0 or ed_mm3 > 0:
+            writer.writerow(["Peritumoral_Edema_ED", ed_vox, f"{ed_mm3:.1f}", f"{ed_mm3/1000.0:.2f}", f"{(ed_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
+    elif men_meas:
+        sub = men_meas.get("subregions") or men_meas.get("subregion_volumes") or {}
+        if sub.get("et_voxels") or sub.get("et_volume_mm3") or sub.get("ncr_net_voxels"):
+            wt_mm3 = sub.get("wt_volume_mm3", tot_mm3)
+            et_mm3 = sub.get("et_volume_mm3", 0.0)
+            ncr_mm3 = sub.get("ncr_net_volume_mm3") or sub.get("ncr_volume_mm3", 0.0)
+            ed_mm3 = sub.get("edema_volume_mm3") or sub.get("ed_volume_mm3", 0.0)
+
+            wt_vox = sub.get("wt_voxels", int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox)
+            et_vox = sub.get("et_voxels", int(et_mm3 / voxel_vol) if voxel_vol else 0)
+            ncr_vox = sub.get("ncr_net_voxels") or sub.get("ncr_voxels", int(ncr_mm3 / voxel_vol) if voxel_vol else 0)
+            ed_vox = sub.get("edema_voxels") or sub.get("ed_voxels", int(ed_mm3 / voxel_vol) if voxel_vol else 0)
+
+            if voxel_vol:
+                wt_mm3 = wt_vox * voxel_vol
+                et_mm3 = et_vox * voxel_vol
+                ncr_mm3 = ncr_vox * voxel_vol
+                ed_mm3 = ed_vox * voxel_vol
+
+            writer.writerow(["Whole_Tumor_WT", wt_vox, f"{wt_mm3:.1f}", f"{wt_mm3/1000.0:.2f}", "100.0%"])
+            writer.writerow(["Enhancing_Tumor_ET", et_vox, f"{et_mm3:.1f}", f"{et_mm3/1000.0:.2f}", f"{(et_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
+            writer.writerow(["Non_Enhancing_Core_NCR", ncr_vox, f"{ncr_mm3:.1f}", f"{ncr_mm3/1000.0:.2f}", f"{(ncr_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
+            writer.writerow(["Peritumoral_Edema_ED", ed_vox, f"{ed_mm3:.1f}", f"{ed_mm3/1000.0:.2f}", f"{(ed_mm3/wt_mm3*100.0):.1f}%" if wt_mm3 else "0.0%"])
+        else:
+            gtv_vox = men_meas.get("gtv_voxels", tot_vox)
+            gtv_mm3 = men_meas.get("gtv_volume_mm3", tot_mm3)
+            if voxel_vol and gtv_vox:
+                gtv_mm3 = gtv_vox * voxel_vol
+            gtv_cm3 = gtv_mm3 / 1000.0
+            writer.writerow(["Gross_Tumor_Volume_GTV", gtv_vox, f"{gtv_mm3:.1f}", f"{gtv_cm3:.2f}", "100.0%"])
     else:
         writer.writerow(["Total_Tumor_Mass", tot_vox, f"{tot_mm3:.1f}", f"{tot_mm3/1000.0:.2f}", "100.0%"])
-
-    writer.writerow([])
-    writer.writerow(["# REGULATORY NOTICE"])
-    writer.writerow(["Disclaimer", "Investigational Research Prototype Only. Not evaluated or approved by FDA or CE. Not for primary diagnosis or clinical treatment planning.", "-", "-"])
 
     return output.getvalue()
 
@@ -234,7 +259,7 @@ def generate_segmentation_png(res_data: Dict[str, Any], request_id: str, api_run
 
     # Footer legend & disclaimer
     draw.text((14, 480 + header_h + 8), "Legend:  Red: NCR (1)  |  Yellow: Edema (2)  |  Green: Enhancing (3)", fill=(226, 232, 240))
-    draw.text((14, 480 + header_h + 26), "2D Cross-Section View  •  Investigational Research  •  Not for Diagnosis", fill=(148, 163, 184))
+    draw.text((14, 480 + header_h + 26), f"Maximal Cross-Section Slice Z={best_z}/{num_slices}  |  Matrix: {mri_vol.shape[0]}×{mri_vol.shape[1]}", fill=(148, 163, 184))
 
     buf = io.BytesIO()
     canvas.save(buf, format="PNG")

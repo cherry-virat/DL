@@ -148,15 +148,6 @@ def generate_pdf_report(res_data: Dict[str, Any], request_id: str, classificatio
         alignment=1,
     )
 
-    disclaimer_style = ParagraphStyle(
-        "Disclaimer",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=7,
-        leading=9,
-        textColor=muted_text,
-    )
-
     elements = []
 
     # 1. Header Banner
@@ -395,10 +386,21 @@ def generate_pdf_report(res_data: Dict[str, Any], request_id: str, classificatio
         wt_mm3 = sub.get("wt_volume_mm3", tot_mm3)
         tc_mm3 = sub.get("tc_volume_mm3", 0.0)
         et_mm3 = sub.get("et_volume_mm3", 0.0)
+        ncr_mm3 = sub.get("ncr_net_volume_mm3") or sub.get("ncr_volume_mm3", 0.0)
+        ed_mm3 = sub.get("edema_volume_mm3") or sub.get("ed_volume_mm3", 0.0)
 
-        wt_vox = int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox
-        tc_vox = int(tc_mm3 / voxel_vol) if voxel_vol else 0
-        et_vox = int(et_mm3 / voxel_vol) if voxel_vol else 0
+        wt_vox = sub.get("wt_voxels", int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox)
+        tc_vox = sub.get("tc_voxels", int(tc_mm3 / voxel_vol) if voxel_vol else 0)
+        et_vox = sub.get("et_voxels", int(et_mm3 / voxel_vol) if voxel_vol else 0)
+        ncr_vox = sub.get("ncr_net_voxels") or sub.get("ncr_voxels", int(ncr_mm3 / voxel_vol) if voxel_vol else 0)
+        ed_vox = sub.get("edema_voxels") or sub.get("ed_voxels", int(ed_mm3 / voxel_vol) if voxel_vol else 0)
+
+        if voxel_vol:
+            wt_mm3 = wt_vox * voxel_vol
+            tc_mm3 = tc_vox * voxel_vol
+            et_mm3 = et_vox * voxel_vol
+            ncr_mm3 = ncr_vox * voxel_vol
+            ed_mm3 = ed_vox * voxel_vol
 
         sub_rows.append([
             Paragraph("<b>Whole Tumor (WT)</b>", table_cell_bold),
@@ -421,46 +423,82 @@ def generate_pdf_report(res_data: Dict[str, Any], request_id: str, classificatio
             Paragraph(f"{et_mm3 / 1000.0:.2f}", table_cell_center),
             Paragraph(f"{(et_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
         ])
+        if ncr_vox > 0 or ncr_mm3 > 0:
+            sub_rows.append([
+                Paragraph("Necrotic Core (NCR)", table_cell_style),
+                Paragraph(f"{ncr_vox:,}", table_cell_center),
+                Paragraph(f"{ncr_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{ncr_mm3 / 1000.0:.2f}", table_cell_center),
+                Paragraph(f"{(ncr_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
+            ])
+        if ed_vox > 0 or ed_mm3 > 0:
+            sub_rows.append([
+                Paragraph("Peritumoral Edema (ED)", table_cell_style),
+                Paragraph(f"{ed_vox:,}", table_cell_center),
+                Paragraph(f"{ed_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{ed_mm3 / 1000.0:.2f}", table_cell_center),
+                Paragraph(f"{(ed_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
+            ])
     elif men_meas:
         sub = men_meas.get("subregions") or men_meas.get("subregion_volumes") or {}
-        wt_mm3 = sub.get("wt_volume_mm3", tot_mm3)
-        et_mm3 = sub.get("et_volume_mm3", 0.0)
-        ncr_mm3 = sub.get("ncr_net_volume_mm3") or sub.get("ncr_volume_mm3", 0.0)
-        ed_mm3 = sub.get("edema_volume_mm3") or sub.get("ed_volume_mm3", 0.0)
+        if sub.get("et_voxels") or sub.get("et_volume_mm3") or sub.get("ncr_net_voxels"):
+            wt_mm3 = sub.get("wt_volume_mm3", tot_mm3)
+            et_mm3 = sub.get("et_volume_mm3", 0.0)
+            ncr_mm3 = sub.get("ncr_net_volume_mm3") or sub.get("ncr_volume_mm3", 0.0)
+            ed_mm3 = sub.get("edema_volume_mm3") or sub.get("ed_volume_mm3", 0.0)
 
-        wt_vox = sub.get("wt_voxels", int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox)
-        et_vox = sub.get("et_voxels", int(et_mm3 / voxel_vol) if voxel_vol else 0)
-        ncr_vox = sub.get("ncr_net_voxels") or sub.get("ncr_voxels", int(ncr_mm3 / voxel_vol) if voxel_vol else 0)
-        ed_vox = sub.get("edema_voxels") or sub.get("ed_voxels", int(ed_mm3 / voxel_vol) if voxel_vol else 0)
+            wt_vox = sub.get("wt_voxels", int(wt_mm3 / voxel_vol) if voxel_vol else tot_vox)
+            et_vox = sub.get("et_voxels", int(et_mm3 / voxel_vol) if voxel_vol else 0)
+            ncr_vox = sub.get("ncr_net_voxels") or sub.get("ncr_voxels", int(ncr_mm3 / voxel_vol) if voxel_vol else 0)
+            ed_vox = sub.get("edema_voxels") or sub.get("ed_voxels", int(ed_mm3 / voxel_vol) if voxel_vol else 0)
 
-        sub_rows.append([
-            Paragraph("<b>Whole Tumor (WT)</b>", table_cell_bold),
-            Paragraph(f"{wt_vox:,}", table_cell_center),
-            Paragraph(f"{wt_mm3:,.1f}", table_cell_center),
-            Paragraph(f"{wt_mm3 / 1000.0:.2f}", table_cell_center),
-            Paragraph("100.0%", table_cell_center),
-        ])
-        sub_rows.append([
-            Paragraph("Enhancing Tumor (ET)", table_cell_style),
-            Paragraph(f"{et_vox:,}", table_cell_center),
-            Paragraph(f"{et_mm3:,.1f}", table_cell_center),
-            Paragraph(f"{et_mm3 / 1000.0:.2f}", table_cell_center),
-            Paragraph(f"{(et_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
-        ])
-        sub_rows.append([
-            Paragraph("Non-Enhancing Core (NCR)", table_cell_style),
-            Paragraph(f"{ncr_vox:,}", table_cell_center),
-            Paragraph(f"{ncr_mm3:,.1f}", table_cell_center),
-            Paragraph(f"{ncr_mm3 / 1000.0:.2f}", table_cell_center),
-            Paragraph(f"{(ncr_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
-        ])
-        sub_rows.append([
-            Paragraph("Peritumoral Edema (ED)", table_cell_style),
-            Paragraph(f"{ed_vox:,}", table_cell_center),
-            Paragraph(f"{ed_mm3:,.1f}", table_cell_center),
-            Paragraph(f"{ed_mm3 / 1000.0:.2f}", table_cell_center),
-            Paragraph(f"{(ed_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
-        ])
+            if voxel_vol:
+                wt_mm3 = wt_vox * voxel_vol
+                et_mm3 = et_vox * voxel_vol
+                ncr_mm3 = ncr_vox * voxel_vol
+                ed_mm3 = ed_vox * voxel_vol
+
+            sub_rows.append([
+                Paragraph("<b>Whole Tumor (WT)</b>", table_cell_bold),
+                Paragraph(f"{wt_vox:,}", table_cell_center),
+                Paragraph(f"{wt_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{wt_mm3 / 1000.0:.2f}", table_cell_center),
+                Paragraph("100.0%", table_cell_center),
+            ])
+            sub_rows.append([
+                Paragraph("Enhancing Tumor (ET)", table_cell_style),
+                Paragraph(f"{et_vox:,}", table_cell_center),
+                Paragraph(f"{et_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{et_mm3 / 1000.0:.2f}", table_cell_center),
+                Paragraph(f"{(et_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
+            ])
+            sub_rows.append([
+                Paragraph("Non-Enhancing Core (NCR)", table_cell_style),
+                Paragraph(f"{ncr_vox:,}", table_cell_center),
+                Paragraph(f"{ncr_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{ncr_mm3 / 1000.0:.2f}", table_cell_center),
+                Paragraph(f"{(ncr_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
+            ])
+            sub_rows.append([
+                Paragraph("Peritumoral Edema (ED)", table_cell_style),
+                Paragraph(f"{ed_vox:,}", table_cell_center),
+                Paragraph(f"{ed_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{ed_mm3 / 1000.0:.2f}", table_cell_center),
+                Paragraph(f"{(ed_mm3 / wt_mm3 * 100.0):.1f}%" if wt_mm3 else "0.0%", table_cell_center),
+            ])
+        else:
+            gtv_vox = men_meas.get("gtv_voxels", tot_vox)
+            gtv_mm3 = men_meas.get("gtv_volume_mm3", tot_mm3)
+            if voxel_vol and gtv_vox:
+                gtv_mm3 = gtv_vox * voxel_vol
+            gtv_cm3 = gtv_mm3 / 1000.0
+            sub_rows.append([
+                Paragraph("<b>Gross Tumor Volume (GTV)</b>", table_cell_bold),
+                Paragraph(f"{gtv_vox:,}", table_cell_center),
+                Paragraph(f"{gtv_mm3:,.1f}", table_cell_center),
+                Paragraph(f"{gtv_cm3:.2f}", table_cell_center),
+                Paragraph("100.0%", table_cell_center),
+            ])
     else:
         # Fallback single summary row
         sub_rows.append([
@@ -515,20 +553,6 @@ def generate_pdf_report(res_data: Dict[str, Any], request_id: str, classificatio
     ]))
     elements.append(t_qc)
     elements.append(Spacer(1, 10))
-
-    # 6. Regulatory & Research Disclaimer Footer Box
-    elements.append(HRFlowable(width="100%", thickness=0.75, color=border_color, spaceBefore=0, spaceAfter=6))
-    elements.append(Paragraph(
-        "<b>RESEARCH PROTOTYPE NOTICE & REGULATORY DISCLAIMER:</b><br/>"
-        "This quantitative assessment report is generated by an investigational deep learning research prototype. "
-        "It has NOT been evaluated, cleared, or approved by the United States Food and Drug Administration (FDA), "
-        "CE mark authorities, or any medical device regulatory agency. This software is provided strictly for academic "
-        "and scientific research purposes. Segmentations, volumetric calculations, and subregion classifications "
-        "must NOT be used as the primary basis for clinical diagnosis, surgical margin delineation, radiation dosing, "
-        "or patient treatment decisions. All volumetric results require review and validation by a licensed medical physicist "
-        "or board-certified diagnostic radiologist.",
-        disclaimer_style,
-    ))
 
     doc.build(elements)
     return buf.getvalue()
