@@ -18,6 +18,7 @@ Frozen Specifications:
 - Subregions: WT (1+2+3), TC (1+3), ET (3)
 """
 
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 import datetime
@@ -58,11 +59,16 @@ from segmentation.glioma_formal_evaluation import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ENV_GLIOMA_CHECKPOINT = os.getenv("GLIOMA_CHECKPOINT_PATH")
 DEFAULT_GLIOMA_CHECKPOINT = (
-    PROJECT_ROOT
-    / "outputs"
-    / "glioma_training"
-    / "glioma_best_medium_experiment.pth"
+    (PROJECT_ROOT / ENV_GLIOMA_CHECKPOINT)
+    if ENV_GLIOMA_CHECKPOINT and not Path(ENV_GLIOMA_CHECKPOINT).is_absolute()
+    else (Path(ENV_GLIOMA_CHECKPOINT) if ENV_GLIOMA_CHECKPOINT else (
+        PROJECT_ROOT
+        / "outputs"
+        / "glioma_training"
+        / "glioma_best_medium_experiment.pth"
+    ))
 )
 
 PATCH_SIZE = (64, 64, 64)
@@ -85,7 +91,16 @@ class GliomaInferenceService:
         device: Optional[torch.device] = None,
         model: Optional[torch.nn.Module] = None,
     ):
-        self.checkpoint_path = Path(checkpoint_path or DEFAULT_GLIOMA_CHECKPOINT)
+        if checkpoint_path is not None:
+            p = Path(checkpoint_path)
+            self.checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+        else:
+            env_ckpt = os.getenv("GLIOMA_CHECKPOINT_PATH")
+            if env_ckpt:
+                p = Path(env_ckpt)
+                self.checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+            else:
+                self.checkpoint_path = DEFAULT_GLIOMA_CHECKPOINT
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._model = model
 

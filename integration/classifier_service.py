@@ -49,14 +49,14 @@ STAGE2_BASELINE_CHECKPOINT = (
 # If a targeted checkpoint is missing on disk, it is honestly reported as unavailable rather than
 # secretly substituting an older baseline or unvalidated file.
 DEFAULT_PRESENCE_CHECKPOINT = (
-    Path(ENV_PRESENCE_CHECKPOINT)
-    if ENV_PRESENCE_CHECKPOINT
-    else STAGE1_CANONICAL_CHECKPOINT
+    (PROJECT_ROOT / ENV_PRESENCE_CHECKPOINT)
+    if ENV_PRESENCE_CHECKPOINT and not Path(ENV_PRESENCE_CHECKPOINT).is_absolute()
+    else (Path(ENV_PRESENCE_CHECKPOINT) if ENV_PRESENCE_CHECKPOINT else STAGE1_CANONICAL_CHECKPOINT)
 )
 DEFAULT_TYPE_CHECKPOINT = (
-    Path(ENV_TYPE_CHECKPOINT)
-    if ENV_TYPE_CHECKPOINT
-    else STAGE2_EXPERIMENT_20261019_CHECKPOINT
+    (PROJECT_ROOT / ENV_TYPE_CHECKPOINT)
+    if ENV_TYPE_CHECKPOINT and not Path(ENV_TYPE_CHECKPOINT).is_absolute()
+    else (Path(ENV_TYPE_CHECKPOINT) if ENV_TYPE_CHECKPOINT else STAGE2_EXPERIMENT_20261019_CHECKPOINT)
 )
 
 
@@ -71,8 +71,27 @@ class ClassifierService:
         type_checkpoint_path: Optional[Union[str, Path]] = None,
         device: Optional[str] = None,
     ):
-        self.presence_checkpoint_path = Path(presence_checkpoint_path) if presence_checkpoint_path else DEFAULT_PRESENCE_CHECKPOINT
-        self.type_checkpoint_path = Path(type_checkpoint_path) if type_checkpoint_path else DEFAULT_TYPE_CHECKPOINT
+        if presence_checkpoint_path is not None:
+            p = Path(presence_checkpoint_path)
+            self.presence_checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+        else:
+            env_p = os.getenv("TUMOR_PRESENCE_CHECKPOINT_PATH")
+            if env_p:
+                p = Path(env_p)
+                self.presence_checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+            else:
+                self.presence_checkpoint_path = DEFAULT_PRESENCE_CHECKPOINT
+
+        if type_checkpoint_path is not None:
+            p = Path(type_checkpoint_path)
+            self.type_checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+        else:
+            env_t = os.getenv("TUMOR_TYPE_CHECKPOINT_PATH")
+            if env_t:
+                p = Path(env_t)
+                self.type_checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+            else:
+                self.type_checkpoint_path = DEFAULT_TYPE_CHECKPOINT
 
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

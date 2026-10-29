@@ -27,6 +27,7 @@ Model & Pipeline Specifications:
     - Prototype research tool only; not for primary clinical diagnosis or standalone decision making.
 """
 
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 import datetime
@@ -57,13 +58,18 @@ from training.meningioma_multimodal_dataset import normalize_nonzero_zscore
 from training.train_meningioma_multimodal import apply_air_masking
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ENV_MENINGIOMA_CHECKPOINT = os.getenv("MENINGIOMA_CHECKPOINT_PATH")
 DEFAULT_MULTIMODAL_CHECKPOINT = (
-    PROJECT_ROOT
-    / "outputs"
-    / "meningioma_multimodal_experiment"
-    / "full800_brainaware_20261014"
-    / "checkpoints"
-    / "meningioma_multimodal_best.pth"
+    (PROJECT_ROOT / ENV_MENINGIOMA_CHECKPOINT)
+    if ENV_MENINGIOMA_CHECKPOINT and not Path(ENV_MENINGIOMA_CHECKPOINT).is_absolute()
+    else (Path(ENV_MENINGIOMA_CHECKPOINT) if ENV_MENINGIOMA_CHECKPOINT else (
+        PROJECT_ROOT
+        / "outputs"
+        / "meningioma_multimodal_experiment"
+        / "full800_brainaware_20261014"
+        / "checkpoints"
+        / "meningioma_multimodal_best.pth"
+    ))
 )
 
 PATCH_SIZE = (64, 64, 64)
@@ -151,7 +157,16 @@ class MeningiomaMultimodalInferenceService:
         device: Optional[torch.device] = None,
         model: Optional[torch.nn.Module] = None,
     ):
-        self.checkpoint_path = Path(checkpoint_path or DEFAULT_MULTIMODAL_CHECKPOINT)
+        if checkpoint_path is not None:
+            p = Path(checkpoint_path)
+            self.checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+        else:
+            env_ckpt = os.getenv("MENINGIOMA_CHECKPOINT_PATH")
+            if env_ckpt:
+                p = Path(env_ckpt)
+                self.checkpoint_path = p if p.is_absolute() else (PROJECT_ROOT / p)
+            else:
+                self.checkpoint_path = DEFAULT_MULTIMODAL_CHECKPOINT
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._model = model
 
