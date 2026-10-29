@@ -649,7 +649,10 @@
 
     <script>
         // Centralized API Base URL (defaults to http://127.0.0.1:5000)
-        const API_BASE_URL = (window.location.port === "5000") ? "" : "http://127.0.0.1:5000";
+       const API_BASE_URL = window.location.hostname === "localhost" ||
+                     window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:5000"
+    : window.location.origin;
 
         let currentRequestId = null;
         let selectedFiles = [];
