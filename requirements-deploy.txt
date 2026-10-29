@@ -10,10 +10,11 @@ Werkzeug>=3.1.0
 # Linux Production WSGI Server
 gunicorn>=21.2.0
 
-# Deep Learning (CPU Wheels from PyPI)
-torch==2.11.0
-torchvision==0.26.0
-torchaudio==2.11.0
+# Deep Learning (CPU-only wheels)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu
+torchvision==0.26.0+cpu
+torchaudio==2.11.0+cpu
 
 # Medical Imaging & Scientific Computation
 monai==1.6.0
