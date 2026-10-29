@@ -32,3 +32,23 @@ outputs/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Local environment and secret files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local scratch and temporary development scripts
+scratch/
+!scratch/audit_acceptance_scenarios.py
+!scratch/audit_current_ixi_processed.py
+!scratch/audit_stage2_data.py
+!scratch/evaluate_independent_test_cases.py
+!scratch/test_healthy_uncertain.py
+!scratch/test_live_scenarios.py
+!scratch/test_mask_load.js
+!scratch/test_split_hashes.py
+
+# Backup and temporary files
+*.bak
