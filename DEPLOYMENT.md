@@ -85,7 +85,9 @@ A declarative `render.yaml` specification is included in the project root:
 2. Create a new **Blueprint** service selecting `render.yaml`.
 3. Choose at least a **Standard (2GB RAM)** instance type to accommodate multi-channel 3D volume loading.
 4. Ensure environment variables (`TORCH_DEVICE=cpu`, `FLASK_ENV=production`) are populated.
-5. In Render, request timeouts should be set to $\ge 180$ seconds to allow CPU sliding-window inference to complete cleanly.
+5. Provide `CHECKPOINT_STORAGE_BUCKET_URL` (e.g. `https://storage.googleapis.com/<bucket>/checkpoints`) to hydrate the 4 model checkpoints during the build step (`python scripts/download_weights.py`).
+6. In Render, request timeouts should be set to >= 180 seconds to allow CPU sliding-window inference to complete cleanly.
+7. Build fail-safe: The build fails immediately with exit code 1 if required weights are missing, preventing ungrounded deployments.
 
 ---
 
@@ -104,9 +106,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy dependency specifications
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+# Copy dependency specifications (use requirements-deploy.txt for headless CPU hosts)
+COPY requirements-deploy.txt .
+RUN pip install --no-cache-dir -r requirements-deploy.txt
 
 # Copy application source code
 COPY api/ api/

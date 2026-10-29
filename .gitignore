@@ -40,7 +40,7 @@ Thumbs.db
 !.env.example
 
 # Local scratch and temporary development scripts
-scratch/
+scratch/*
 !scratch/audit_acceptance_scenarios.py
 !scratch/audit_current_ixi_processed.py
 !scratch/audit_stage2_data.py
