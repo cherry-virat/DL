@@ -12,10 +12,9 @@ Usage:
 """
 
 import os
-from api.app import create_app
+from api.app import app as application, create_app
 
-# Instantiate production application
-application = create_app()
+# Reuse module-level application to prevent duplicate Flask app initialization
 app = application  # Alias for server runners expecting 'app'
 
 if __name__ == "__main__":

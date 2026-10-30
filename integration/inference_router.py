@@ -38,15 +38,18 @@ from integration.result_schema import (
     TumorType,
     SegmentationResult,
 )
-from integration.glioma_inference_service import (
-    GliomaInferenceService,
-)
-from integration.meningioma_multimodal_service import (
-    MeningiomaMultimodalInferenceService,
-)
-from integration.classifier_service import (
-    ClassifierService,
-)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from integration.glioma_inference_service import (
+        GliomaInferenceService,
+    )
+    from integration.meningioma_multimodal_service import (
+        MeningiomaMultimodalInferenceService,
+    )
+    from integration.classifier_service import (
+        ClassifierService,
+    )
 
 
 class AutomaticClassificationUnavailableError(ValueError):
@@ -72,10 +75,10 @@ class InferenceRouter:
 
     def __init__(
         self,
-        glioma_service: Optional[GliomaInferenceService] = None,
+        glioma_service: Optional[Any] = None,
         meningioma_service: Optional[Any] = None,
-        meningioma_multimodal_service: Optional[MeningiomaMultimodalInferenceService] = None,
-        classifier_service: Optional[ClassifierService] = None,
+        meningioma_multimodal_service: Optional[Any] = None,
+        classifier_service: Optional[Any] = None,
     ):
         self._glioma_service = glioma_service
         # The sole active meningioma service is 4-channel multimodal
@@ -83,26 +86,45 @@ class InferenceRouter:
         self._classifier_service = classifier_service
 
     @property
-    def glioma_service(self) -> GliomaInferenceService:
+    def glioma_service(self) -> Any:
         if self._glioma_service is None:
+            from integration.glioma_inference_service import GliomaInferenceService
             self._glioma_service = GliomaInferenceService()
         return self._glioma_service
 
+    @glioma_service.setter
+    def glioma_service(self, service: Optional[Any]) -> None:
+        self._glioma_service = service
+
     @property
-    def meningioma_service(self) -> MeningiomaMultimodalInferenceService:
+    def meningioma_service(self) -> Any:
         if self._meningioma_service is None:
+            from integration.meningioma_multimodal_service import MeningiomaMultimodalInferenceService
             self._meningioma_service = MeningiomaMultimodalInferenceService()
         return self._meningioma_service
 
-    @property
-    def meningioma_multimodal_service(self) -> MeningiomaMultimodalInferenceService:
-        return self.meningioma_service
+    @meningioma_service.setter
+    def meningioma_service(self, service: Optional[Any]) -> None:
+        self._meningioma_service = service
 
     @property
-    def classifier_service(self) -> ClassifierService:
+    def meningioma_multimodal_service(self) -> Any:
+        return self.meningioma_service
+
+    @meningioma_multimodal_service.setter
+    def meningioma_multimodal_service(self, service: Optional[Any]) -> None:
+        self.meningioma_service = service
+
+    @property
+    def classifier_service(self) -> Any:
         if self._classifier_service is None:
+            from integration.classifier_service import ClassifierService
             self._classifier_service = ClassifierService()
         return self._classifier_service
+
+    @classifier_service.setter
+    def classifier_service(self, service: Optional[Any]) -> None:
+        self._classifier_service = service
 
     def normalize_tumor_type(self, tumor_type: Union[TumorType, str]) -> TumorType:
         """

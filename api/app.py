@@ -312,17 +312,6 @@ def create_app(router: Optional[InferenceRouter] = None) -> Flask:
 
     # Attach router instance
     router_inst = router or InferenceRouter()
-    from integration.classifier_service import ClassifierService
-    from unittest.mock import Mock
-    if not hasattr(router_inst, "classifier_service") or (
-        isinstance(getattr(router_inst, "classifier_service", None), Mock)
-        and not getattr(router_inst.classifier_service, "_is_custom_mock", False)
-    ):
-        try:
-            router_inst.classifier_service = ClassifierService()
-        except Exception:
-            pass
-
     app.config["ROUTER"] = router_inst
     app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE_BYTES
 
