@@ -21,22 +21,29 @@ from integration.result_schema import (
     OfflineEvaluationMetrics,
     SegmentationResult,
 )
-from integration.glioma_inference_service import (
-    GliomaInferenceService,
-    run_glioma_inference,
-)
-from integration.meningioma_inference_service import (
-    MeningiomaInferenceService,
-    run_meningioma_inference,
-)
-from integration.meningioma_multimodal_service import (
-    MeningiomaMultimodalInferenceService,
-    run_meningioma_multimodal_inference,
-)
 from integration.inference_router import (
     InferenceRouter,
     run_inference,
 )
+
+# Lazy exports for heavy inference services (PEP 562) to prevent eager PyTorch/MONAI loading
+_LAZY_EXPORTS = {
+    "GliomaInferenceService": "integration.glioma_inference_service",
+    "run_glioma_inference": "integration.glioma_inference_service",
+    "MeningiomaInferenceService": "integration.meningioma_inference_service",
+    "run_meningioma_inference": "integration.meningioma_inference_service",
+    "MeningiomaMultimodalInferenceService": "integration.meningioma_multimodal_service",
+    "run_meningioma_multimodal_inference": "integration.meningioma_multimodal_service",
+}
+
+def __getattr__(name: str):
+    if name in _LAZY_EXPORTS:
+        import importlib
+        module = importlib.import_module(_LAZY_EXPORTS[name])
+        val = getattr(module, name)
+        globals()[name] = val
+        return val
+    raise AttributeError(f"module 'integration' has no attribute '{name}'")
 
 __all__ = [
     "TumorType",
