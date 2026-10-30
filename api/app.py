@@ -44,7 +44,7 @@ from integration.inference_router import (
     NoTumorDetectedError,
 )
 from integration.result_schema import TumorType, SegmentationResult
-from integration.meningioma_multimodal_service import is_segmentation_mask_filename
+from utils.file_utils import is_segmentation_mask_filename
 
 API_RUNS_DIR = PROJECT_ROOT / "outputs" / "api_runs"
 API_RUNS_DIR.mkdir(parents=True, exist_ok=True)

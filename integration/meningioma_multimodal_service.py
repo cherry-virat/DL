@@ -56,6 +56,7 @@ from integration.result_schema import (
 from models.meningioma_multimodal_unet import create_multimodal_unet
 from training.meningioma_multimodal_dataset import normalize_nonzero_zscore
 from utils.tensor_utils import apply_air_masking
+from utils.file_utils import is_segmentation_mask_filename
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENV_MENINGIOMA_CHECKPOINT = os.getenv("MENINGIOMA_CHECKPOINT_PATH")
@@ -101,33 +102,7 @@ RESEARCH_DISCLAIMER = (
 )
 
 
-def is_segmentation_mask_filename(filename: str) -> bool:
-    """
-    Checks whether a filename represents a segmentation mask or ground-truth label volume
-    rather than a raw structural MRI acquisition sequence.
-    """
-    fn_lower = filename.lower()
-    base = fn_lower
-    for ext in (".gz", ".nii", ".tar", ".zip"):
-        if base.endswith(ext):
-            base = base[:-len(ext)]
-
-    if base in ("seg", "mask", "gtv", "label", "labels"):
-        return True
-
-    for tok in ("-seg", "_seg", ".seg", "-mask", "_mask", ".mask", "-gtv", "_gtv", ".gtv"):
-        if base.endswith(tok):
-            return True
-
-    for tok in ("seg", "mask", "gtv"):
-        if f"-{tok}-" in fn_lower or f"_{tok}_" in fn_lower or f".{tok}." in fn_lower:
-            return True
-        if fn_lower.endswith(f"-{tok}.nii.gz") or fn_lower.endswith(f"_{tok}.nii.gz"):
-            return True
-        if fn_lower.endswith(f"-{tok}.nii") or fn_lower.endswith(f"_{tok}.nii"):
-            return True
-
-    return False
+# Note: is_segmentation_mask_filename is imported from utils.file_utils above
 
 
 def detect_modality_key(filename: str) -> Optional[str]:
