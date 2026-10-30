@@ -18,9 +18,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import unittest.mock
+
 import numpy as np
 import pytest
 import torch
+import torch.nn as nn
 
 from models.meningioma_multimodal_unet import create_multimodal_unet
 from models.meningioma_segresnet import create_segresnet
@@ -351,6 +354,78 @@ def test_checkpoint_resume_weights_only_compat():
         loaded_project = load_checkpoint(project_ckpt, eval_model, eval_optim)
         assert loaded_project["epoch"] == 2
         assert "model_state_dict" in loaded_project
+
+
+def test_load_checkpoint_device_compatibility():
+    """
+    Verifies CPU/GPU-compatible checkpoint loading:
+    1. CPU model loads a checkpoint saved with CUDA tensor storage when device=None.
+    2. Explicit device=torch.device('cpu') works.
+    3. Explicit device=torch.device('cuda') works when CUDA is available.
+    4. Optimizer state is restored with matching tensor devices.
+    5. Path objects in checkpoint metadata are preserved.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ckpt_path = Path(tmpdir) / "cuda_saved_checkpoint.pth"
+
+        # Create dummy tensors (simulate CUDA storage if CUDA is available, or manually set device)
+        if torch.cuda.is_available():
+            save_device = torch.device("cuda:0")
+        else:
+            save_device = torch.device("cpu")
+
+        source_model = nn.Linear(4, 2).to(save_device)
+        source_optim = torch.optim.Adam(source_model.parameters(), lr=1e-3)
+        x = torch.randn(2, 4, device=save_device)
+        loss = source_model(x).sum()
+        loss.backward()
+        source_optim.step()
+
+        payload = {
+            "epoch": 5,
+            "model_state_dict": source_model.state_dict(),
+            "optimizer_state_dict": source_optim.state_dict(),
+            "metadata_path": Path("some/nested/path/config.json"),
+        }
+        torch.save(payload, ckpt_path)
+
+        # 1. CPU model loads CUDA-saved checkpoint with device=None
+        # Even when torch.cuda.is_available() is mocked as False
+        with unittest.mock.patch("torch.cuda.is_available", return_value=False):
+            cpu_model = nn.Linear(4, 2)  # on CPU
+            cpu_optim = torch.optim.Adam(cpu_model.parameters(), lr=1e-3)
+
+            loaded = load_checkpoint(ckpt_path, cpu_model, cpu_optim, device=None)
+            assert loaded["epoch"] == 5
+            assert isinstance(loaded["metadata_path"], Path)
+            assert next(cpu_model.parameters()).device.type == "cpu"
+            for state in cpu_optim.state.values():
+                for v in state.values():
+                    if torch.is_tensor(v):
+                        assert v.device.type == "cpu"
+
+        # 2. Explicit CPU device
+        cpu_model_exp = nn.Linear(4, 2)
+        cpu_optim_exp = torch.optim.Adam(cpu_model_exp.parameters(), lr=1e-3)
+        loaded_exp = load_checkpoint(ckpt_path, cpu_model_exp, cpu_optim_exp, device=torch.device("cpu"))
+        assert loaded_exp["epoch"] == 5
+        assert next(cpu_model_exp.parameters()).device.type == "cpu"
+        for state in cpu_optim_exp.state.values():
+            for v in state.values():
+                if torch.is_tensor(v):
+                    assert v.device.type == "cpu"
+
+        # 3. Explicit CUDA device when CUDA is available
+        if torch.cuda.is_available():
+            cuda_model = nn.Linear(4, 2).cuda()
+            cuda_optim = torch.optim.Adam(cuda_model.parameters(), lr=1e-3)
+            loaded_cuda = load_checkpoint(ckpt_path, cuda_model, cuda_optim, device=torch.device("cuda:0"))
+            assert loaded_cuda["epoch"] == 5
+            assert next(cuda_model.parameters()).device.type == "cuda"
+            for state in cuda_optim.state.values():
+                for v in state.values():
+                    if torch.is_tensor(v):
+                        assert v.device.type == "cuda"
 
 
 def test_brain_aware_sampling_synthetic():

@@ -34,6 +34,7 @@ from pathlib import Path
 import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
+from utils.tensor_utils import apply_air_masking
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -129,21 +130,46 @@ def load_checkpoint(
     scaler: Optional[torch.amp.GradScaler] = None,
     device: Optional[torch.device] = None,
 ) -> Dict[str, Any]:
-    """Loads model, optimizer, scheduler, and scaler weights from checkpoint."""
+    """Loads model, optimizer, scheduler, and scaler weights from checkpoint.
+
+    Device resolution:
+    - If `device` is explicitly provided, it is used as the loading destination.
+    - Otherwise, the model's current parameter/buffer device is used.
+    - If the target device is CUDA but CUDA is not available, falls back to CPU.
+    """
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found at: {checkpoint_path}")
+
+    # Determine loading target device
+    if device is not None:
+        target_device = torch.device(device)
+    else:
+        try:
+            target_device = next(model.parameters()).device
+        except (StopIteration, AttributeError):
+            try:
+                target_device = next(model.buffers()).device
+            except (StopIteration, AttributeError):
+                target_device = torch.device("cpu")
+
+    if target_device.type == "cuda" and not torch.cuda.is_available():
+        target_device = torch.device("cpu")
 
     # Fix 2: Explicitly set weights_only=False for trusted project checkpoints.
     # PyTorch 2.6+ defaults to weights_only=True, which rejects metadata dicts containing Path objects.
     try:
-        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        checkpoint = torch.load(checkpoint_path, map_location=target_device, weights_only=False)
     except TypeError:
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(checkpoint_path, map_location=target_device)
 
     model.load_state_dict(checkpoint["model_state_dict"])
 
     if optimizer is not None and "optimizer_state_dict" in checkpoint:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if torch.is_tensor(v):
+                    state[k] = v.to(target_device)
     if scheduler is not None and "scheduler_state_dict" in checkpoint:
         scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
     if scaler is not None and "scaler_state_dict" in checkpoint:
@@ -212,36 +238,7 @@ def train_one_epoch(
     }
 
 
-# ============================================================
-# AIR MASKING UTILITY
-# ============================================================
 
-def apply_air_masking(prediction: torch.Tensor, image: torch.Tensor) -> torch.Tensor:
-    """
-    Sets predicted class to background (0) for empty-air voxels.
-    Empty-air voxels are defined as voxels where all four input channels are zero,
-    matching the non-zero z-score preprocessing convention (normalize_nonzero_zscore).
-
-    Args:
-        prediction: Integer class prediction tensor of shape [D, H, W] or [B, D, H, W].
-        image: Normalized 4-channel input image tensor of shape [4, D, H, W] or [B, 4, D, H, W].
-
-    Returns:
-        prediction: Tensor of same shape with empty-air voxels set to class 0 (background).
-    """
-    if image.ndim == 4:
-        # image: [4, D, H, W], prediction: [D, H, W]
-        is_air = torch.all(image == 0, dim=0)
-    elif image.ndim == 5:
-        # image: [B, 4, D, H, W], prediction: [B, D, H, W]
-        is_air = torch.all(image == 0, dim=1)
-    else:
-        raise ValueError(f"Expected image tensor with 4 or 5 dims, got shape {tuple(image.shape)}")
-
-    is_air = is_air.to(prediction.device)
-    masked_pred = prediction.clone()
-    masked_pred[is_air] = 0
-    return masked_pred
 
 
 # ============================================================

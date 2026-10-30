@@ -55,7 +55,7 @@ from integration.result_schema import (
 )
 from models.meningioma_multimodal_unet import create_multimodal_unet
 from training.meningioma_multimodal_dataset import normalize_nonzero_zscore
-from training.train_meningioma_multimodal import apply_air_masking
+from utils.tensor_utils import apply_air_masking
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENV_MENINGIOMA_CHECKPOINT = os.getenv("MENINGIOMA_CHECKPOINT_PATH")
